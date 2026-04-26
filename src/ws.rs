@@ -90,6 +90,13 @@ pub fn parse_sendbird_ws_frame(frame: &str) -> Result<SendbirdWsEvent, HingeErro
     parse_prefixed_json(frame)
 }
 
+pub(crate) fn sendbird_logi_session_key(payload: &serde_json::Value) -> Option<&str> {
+    payload
+        .get("key")
+        .or_else(|| payload.get("session_key"))
+        .and_then(|value| value.as_str())
+}
+
 fn parse_prefixed_json(frame: &str) -> Result<SendbirdWsEvent, HingeError> {
     let Some(start) = frame.find('{') else {
         return Ok(SendbirdWsEvent::Raw {
@@ -102,9 +109,7 @@ fn parse_prefixed_json(frame: &str) -> Result<SendbirdWsEvent, HingeError> {
 
     match prefix {
         "LOGI" => Ok(SendbirdWsEvent::SessionKey {
-            key: payload
-                .get("key")
-                .and_then(|value| value.as_str())
+            key: sendbird_logi_session_key(&payload)
                 .unwrap_or_default()
                 .to_string(),
         }),
@@ -135,6 +140,18 @@ mod tests {
     #[test]
     fn parses_logi_session_key() {
         let event = parse_sendbird_ws_frame(r#"LOGI{"key":"session-key","user_id":"u1"}"#)
+            .expect("LOGI frame should parse");
+        assert_eq!(
+            event,
+            SendbirdWsEvent::SessionKey {
+                key: "session-key".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn parses_logi_session_key_alias() {
+        let event = parse_sendbird_ws_frame(r#"LOGI{"session_key":"session-key","user_id":"u1"}"#)
             .expect("LOGI frame should parse");
         assert_eq!(
             event,

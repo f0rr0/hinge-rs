@@ -2,16 +2,16 @@
 
 ## Development
 
-Run the same checks as CI before opening a pull request:
+For focused local verification before opening a pull request:
 
 ```bash
-cargo fmt -- --check
-cargo fmt --manifest-path xtask/Cargo.toml -- --check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test --locked
-cargo test --locked --manifest-path xtask/Cargo.toml
-cargo run --locked --manifest-path xtask/Cargo.toml -- openapi
+scripts/validate.sh ci
+cargo deny check
 ```
+
+CI also runs the MSRV all-feature check, feature powerset, dependency policy,
+package verification, semver compatibility, workflow lint, and release/docs
+deployment gates.
 
 Generated API reference artifacts must be committed when API docs change:
 
@@ -26,7 +26,7 @@ This repo uses `prek`, a Rust Git hook runner.
 
 ```bash
 brew install prek
-prek install --prepare-hooks
+scripts/install-hooks.sh
 ```
 
 If you do not use Homebrew, install a prebuilt `prek` binary from the GitHub
@@ -40,12 +40,13 @@ the source-build fallback.
   Cargo metadata validation.
 - `commit-msg` uses `committed` to enforce Conventional Commit subjects. The
   configured hook downloads the upstream prebuilt binary for normal setup.
-- `pre-push` is heavier: all-feature check, clippy, tests, xtask tests, and
-  OpenAPI/Scalar regeneration validation.
+- `pre-push` is heavier but still bounded: clippy, tests, and OpenAPI/Scalar
+  regeneration validation. It deliberately leaves the slow matrix/policy checks
+  to CI. If generated docs are already dirty, it fails before running Rust
+  checks so you can commit or stash them first.
 
 The slowest release gates stay in CI: feature powerset, dependency policy,
-package verification, semver compatibility, release automation, and docs
-deployment.
+semver compatibility, release automation, and docs deployment.
 
 CI is the source of truth. Local hooks are convenience checks and can be skipped;
 the CI workflow reruns the pre-commit hook set, enforces Conventional Commits
@@ -94,6 +95,6 @@ after relevant changes land on `main`. The root page is latest, and release
 snapshots are generated from git tags under `/v/<version>/` during docs and
 release deployment. Historical snapshots are not committed to `main`.
 
-For the first crates.io publish, configure `CARGO_REGISTRY_TOKEN` in the GitHub
-repository secrets. The workflow also grants `id-token: write` so the project
-can move to crates.io trusted publishing later.
+Publishing uses release-plz with crates.io Trusted Publishing. Do not configure
+`CARGO_REGISTRY_TOKEN`; the release workflow relies on the GitHub OIDC token
+granted by `id-token: write`.

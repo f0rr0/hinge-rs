@@ -4,29 +4,46 @@
 /// logger before constructing the client.
 pub fn init_logger() {}
 
+fn sensitive_header_value(
+    name: &reqwest::header::HeaderName,
+    value: &reqwest::header::HeaderValue,
+) -> String {
+    let name = name.as_str();
+    if name.eq_ignore_ascii_case("authorization") {
+        return "Bearer ***REDACTED***".to_string();
+    }
+    if name.eq_ignore_ascii_case("sb-access-token")
+        || name.eq_ignore_ascii_case("session-key")
+        || name.eq_ignore_ascii_case("x-session-key")
+    {
+        return "***REDACTED***".to_string();
+    }
+    if name.eq_ignore_ascii_case("x-session-id")
+        || name.eq_ignore_ascii_case("x-device-id")
+        || name.eq_ignore_ascii_case("x-install-id")
+    {
+        return format!(
+            "***{}",
+            &value
+                .to_str()
+                .unwrap_or("")
+                .chars()
+                .rev()
+                .take(4)
+                .collect::<String>()
+                .chars()
+                .rev()
+                .collect::<String>()
+        );
+    }
+    value.to_str().unwrap_or("").to_string()
+}
+
 /// Format HTTP headers for logging (hiding sensitive data)
 pub fn format_headers(headers: &reqwest::header::HeaderMap) -> String {
     let mut output = String::new();
     for (name, value) in headers.iter() {
-        let value_str = if name == "authorization" {
-            "Bearer ***REDACTED***".to_string()
-        } else if name == "x-session-id" || name == "x-device-id" || name == "x-install-id" {
-            format!(
-                "***{}",
-                &value
-                    .to_str()
-                    .unwrap_or("")
-                    .chars()
-                    .rev()
-                    .take(4)
-                    .collect::<String>()
-                    .chars()
-                    .rev()
-                    .collect::<String>()
-            )
-        } else {
-            value.to_str().unwrap_or("").to_string()
-        };
+        let value_str = sensitive_header_value(name, value);
         output.push_str(&format!("  {}: {}\n", name.as_str(), value_str));
     }
     output
@@ -40,10 +57,27 @@ pub fn format_ws_headers(headers: &[(impl AsRef<str>, impl AsRef<str>)]) -> Stri
         let v = value.as_ref();
         let value_str = if n.eq_ignore_ascii_case("SENDBIRD-WS-AUTH")
             || n.eq_ignore_ascii_case("SENDBIRD-WS-TOKEN")
+            || n.eq_ignore_ascii_case("sb-access-token")
+            || n.eq_ignore_ascii_case("session-key")
+            || n.eq_ignore_ascii_case("x-session-key")
         {
             "***REDACTED***".to_string()
         } else if n.eq_ignore_ascii_case("Cookie") {
             "***".to_string()
+        } else if n.eq_ignore_ascii_case("x-session-id")
+            || n.eq_ignore_ascii_case("x-device-id")
+            || n.eq_ignore_ascii_case("x-install-id")
+        {
+            format!(
+                "***{}",
+                v.chars()
+                    .rev()
+                    .take(4)
+                    .collect::<String>()
+                    .chars()
+                    .rev()
+                    .collect::<String>()
+            )
         } else {
             v.to_string()
         };
@@ -87,24 +121,7 @@ pub fn log_response(
     log::debug!("Headers:");
     // Log each header on its own line so the logger prefix is consistent
     for (name, value) in headers.iter() {
-        let printable = value.to_str().unwrap_or("");
-        let value_str = if name == "authorization" {
-            "Bearer ***REDACTED***".to_string()
-        } else if name == "x-session-id" || name == "x-device-id" || name == "x-install-id" {
-            format!(
-                "***{}",
-                printable
-                    .chars()
-                    .rev()
-                    .take(4)
-                    .collect::<String>()
-                    .chars()
-                    .rev()
-                    .collect::<String>()
-            )
-        } else {
-            printable.to_string()
-        };
+        let value_str = sensitive_header_value(name, value);
         log::debug!("  {}: {}", name.as_str(), value_str);
     }
 

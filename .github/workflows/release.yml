@@ -29,6 +29,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  PREK_VERSION: 0.3.10
 
 jobs:
   verify:
@@ -42,39 +43,17 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: prek@${{ env.PREK_VERSION }}
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
             . -> target
             xtask -> target
 
-      - name: Format
-        run: |
-          cargo fmt -- --check
-          cargo fmt --manifest-path xtask/Cargo.toml -- --check
-
-      - name: Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
-
-      - name: Test crate
-        run: cargo test --locked
-
-      - name: Generate OpenAPI and Scalar docs
-        run: cargo run --locked --manifest-path xtask/Cargo.toml -- openapi
-
-      - name: Test xtask
-        run: cargo test --locked --manifest-path xtask/Cargo.toml
-
-      - name: Validate generated docs are committed
-        run: |
-          git diff --exit-code -- \
-            openapi/hinge-api.openapi.json \
-            docs/api/openapi.json \
-            docs/api/index.html \
-            docs/api/versions.json
-
-      - name: Verify crate package
-        run: cargo package --locked
+      - name: Validate release gates
+        run: scripts/validate.sh release
 
   release-pr:
     name: Create or update release PR

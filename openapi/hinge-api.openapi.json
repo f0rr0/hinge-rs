@@ -5049,7 +5049,14 @@
       "name": "MIT OR Apache-2.0"
     },
     "title": "hinge-rs",
-    "version": "0.1.0"
+    "version": "0.1.0",
+    "x-scalar-sdk-installation": [
+      {
+        "description": "Install the typed Rust client from crates.io:",
+        "lang": "Rust",
+        "source": "cargo add hinge-rs"
+      }
+    ]
   },
   "openapi": "3.1.0",
   "paths": {
@@ -5152,6 +5159,13 @@
         "summary": "Submit email 2FA code",
         "tags": [
           "Auth"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\n\nlet tokens = client\n    .auth()\n    .submit_email_code(\"case-id\", \"123456\")\n    .await?;\nclient.persistence().save_session(\"session.json\")?;"
+          }
         ]
       }
     },
@@ -5248,6 +5262,13 @@
         "summary": "Get auth settings",
         "tags": [
           "Settings"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet settings = client.settings().auth().await?;"
+          }
         ]
       }
     },
@@ -5375,6 +5396,13 @@
         "summary": "Submit SMS OTP",
         "tags": [
           "Auth"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\n\nlet tokens = client.auth().submit_otp(\"123456\").await?;\nclient.persistence().save_session(\"session.json\")?;"
+          }
         ]
       }
     },
@@ -5485,6 +5513,13 @@
         "summary": "Initiate SMS login",
         "tags": [
           "Auth"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\n\nclient.auth().initiate_sms().await?;"
+          }
         ]
       }
     },
@@ -5591,6 +5626,13 @@
         "summary": "Get connection detail",
         "tags": [
           "Connections"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet detail = client.connections().detail(\"subject_id\").await?;"
+          }
         ]
       }
     },
@@ -5687,6 +5729,13 @@
         "summary": "List connections",
         "tags": [
           "Connections"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet matches = client.connections().list().await?;"
+          }
         ]
       }
     },
@@ -5800,6 +5849,13 @@
         "summary": "Get match note",
         "tags": [
           "Connections"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet note = client.connections().match_note(\"subject_id\").await?;"
+          }
         ]
       }
     },
@@ -6012,6 +6068,13 @@
         "summary": "Evaluate answer",
         "tags": [
           "Prompts"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet review = client.prompts().evaluate_answer(payload).await?;"
+          }
         ]
       }
     },
@@ -6118,6 +6181,13 @@
         "summary": "Update answers",
         "tags": [
           "Settings"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet response = client.settings().update_answers(answers).await?;"
+          }
         ]
       }
     },
@@ -6224,6 +6294,13 @@
         "summary": "Create prompt poll",
         "tags": [
           "Prompts"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet created = client.prompts().create_prompt_poll(payload).await?;"
+          }
         ]
       }
     },
@@ -6320,6 +6397,13 @@
         "summary": "Get content settings",
         "tags": [
           "Settings"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet settings = client.settings().content().await?;"
+          }
         ]
       },
       "patch": {
@@ -6424,6 +6508,13 @@
         "summary": "Update content settings",
         "tags": [
           "Settings"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet response = client.settings().update_content(settings).await?;"
+          }
         ]
       }
     },
@@ -6530,6 +6621,13 @@
         "summary": "Create video prompt",
         "tags": [
           "Prompts"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet created = client.prompts().create_video_prompt(payload).await?;"
+          }
         ]
       }
     },
@@ -6626,6 +6724,13 @@
         "summary": "Get self content",
         "tags": [
           "Profiles"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet content = client.profiles().content().await?;"
+          }
         ]
       }
     },
@@ -6732,6 +6837,13 @@
         "summary": "Get public profile content",
         "tags": [
           "Profiles"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet content = client\n    .profiles()\n    .public_content(vec![\"user_id\".to_string()])\n    .await?;"
+          }
         ]
       }
     },
@@ -6846,6 +6958,13 @@
         "summary": "Review message text",
         "tags": [
           "Chat"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet raw = client\n    .raw()\n    .hinge(\n        reqwest::Method::POST,\n        \"/flag/textreview\",\n        Some(serde_json::json!({\n            \"text\": \"hey\",\n            \"receiverId\": \"user_id\"\n        })),\n    )\n    .await?;"
+          }
         ]
       }
     },
@@ -6952,6 +7071,13 @@
         "summary": "Create Sendbird DM channel",
         "tags": [
           "Sendbird REST"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet channel = client\n    .chat()\n    .get_or_create_dm_channel(\"self_user_id\", \"peer_user_id\")\n    .await?;"
+          }
         ]
       }
     },
@@ -7076,6 +7202,13 @@
         "summary": "Get Sendbird messages",
         "tags": [
           "Sendbird REST"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet messages = client\n    .chat()\n    .full_messages(\"sendbird_group_channel\")\n    .await?;"
+          }
         ]
       }
     },
@@ -7291,6 +7424,13 @@
         "summary": "Get like subject",
         "tags": [
           "Likes"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet like = client.likes().subject(\"subject_id\").await?;"
+          }
         ]
       }
     },
@@ -7387,6 +7527,13 @@
         "summary": "List likes",
         "tags": [
           "Likes"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet likes = client.likes().list().await?;"
+          }
         ]
       }
     },
@@ -7491,6 +7638,13 @@
         "summary": "Get like limit",
         "tags": [
           "Likes"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet limit = client.likes().limit().await?;"
+          }
         ]
       }
     },
@@ -7612,6 +7766,13 @@
         "summary": "Authenticate Sendbird",
         "tags": [
           "Chat"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet credentials = client.chat().credentials().await?;"
+          }
         ]
       }
     },
@@ -7732,6 +7893,13 @@
         "summary": "Send Hinge message",
         "tags": [
           "Chat"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet sent = client.chat().send_message(payload).await?;"
+          }
         ]
       }
     },
@@ -7828,6 +7996,13 @@
         "summary": "Get notification settings",
         "tags": [
           "Settings"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet settings = client.settings().notifications().await?;"
+          }
         ]
       }
     },
@@ -7924,6 +8099,13 @@
         "summary": "Get self preferences",
         "tags": [
           "Profiles"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet preferences = client.settings().preferences().await?;"
+          }
         ]
       },
       "patch": {
@@ -8028,6 +8210,13 @@
         "summary": "Update self preferences",
         "tags": [
           "Settings"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet response = client\n    .settings()\n    .update_preferences(preferences)\n    .await?;"
+          }
         ]
       }
     },
@@ -8134,6 +8323,13 @@
         "summary": "List prompts",
         "tags": [
           "Prompts"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet prompts = client.prompts().list().await?;"
+          }
         ]
       }
     },
@@ -8240,6 +8436,13 @@
         "summary": "Rate or skip user",
         "tags": [
           "Ratings"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet response = client.ratings().rate_user(rate_input).await?;"
+          }
         ]
       }
     },
@@ -8346,6 +8549,13 @@
         "summary": "Respond to rate",
         "tags": [
           "Ratings"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet response = client.ratings().respond(rate_response).await?;"
+          }
         ]
       }
     },
@@ -8461,6 +8671,13 @@
         "summary": "Get recommendations",
         "tags": [
           "Recommendations"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet recs = client.recommendations().get().await?;"
+          }
         ]
       }
     },
@@ -8567,6 +8784,13 @@
         "summary": "Export chat helper",
         "tags": [
           "Chat"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet result = client\n    .chat()\n    .export_chat(hinge_rs::models::ExportChatInput {\n        channel_url: \"sendbird_group_channel\".to_string(),\n        output_dir: \"exports/chat\".to_string(),\n        include_media: true,\n        initiation_summary_lines: None,\n    })\n    .await?;"
+          }
         ]
       }
     },
@@ -8673,6 +8897,13 @@
         "summary": "Get Sendbird channel",
         "tags": [
           "Sendbird REST"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet channel = client\n    .chat()\n    .channel(\"sendbird_group_channel\")\n    .await?;"
+          }
         ]
       }
     },
@@ -8710,6 +8941,13 @@
         "summary": "Connect Sendbird WebSocket",
         "tags": [
           "Sendbird WebSocket"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet mut events = client.chat().subscribe_events().await?;\nlet event = events.recv().await?;\nprintln!(\"{event:?}\");"
+          }
         ],
         "x-websocket-events": {
           "client": [
@@ -8826,6 +9064,13 @@
         "summary": "Get standouts",
         "tags": [
           "Recommendations"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet standouts = client.connections().standouts().await?;"
+          }
         ]
       }
     },
@@ -8922,6 +9167,13 @@
         "summary": "Get account info",
         "tags": [
           "Settings"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet account = client.settings().account_info().await?;"
+          }
         ]
       }
     },
@@ -9018,6 +9270,13 @@
         "summary": "Get export status",
         "tags": [
           "Settings"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet status = client.settings().export_status().await?;"
+          }
         ]
       }
     },
@@ -9114,6 +9373,13 @@
         "summary": "Repeat profiles",
         "tags": [
           "Recommendations"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet repeated = client.recommendations().repeat_profiles().await?;"
+          }
         ]
       }
     },
@@ -9210,6 +9476,13 @@
         "summary": "Get user traits",
         "tags": [
           "Settings"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet traits = client.settings().user_traits().await?;"
+          }
         ]
       }
     },
@@ -9306,6 +9579,13 @@
         "summary": "Get self profile",
         "tags": [
           "Profiles"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet profile = client.profiles().me().await?;"
+          }
         ]
       },
       "patch": {
@@ -9410,6 +9690,13 @@
         "summary": "Update self profile",
         "tags": [
           "Profiles"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet response = client.profiles().update(profile_update).await?;"
+          }
         ]
       }
     },
@@ -9516,6 +9803,13 @@
         "summary": "Get public profiles",
         "tags": [
           "Profiles"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet profiles = client\n    .profiles()\n    .public(vec![\"user_id\".to_string()])\n    .await?;"
+          }
         ]
       }
     },
@@ -9658,6 +9952,13 @@
         "summary": "List my Sendbird channels",
         "tags": [
           "Sendbird REST"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nlet channels = client.chat().channels(30).await?;"
+          }
         ]
       }
     }

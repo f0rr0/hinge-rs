@@ -255,6 +255,11 @@ fn scalar_index_html(config: &ScalarPageConfig) -> Result<String, serde_json::Er
         url: './openapi.json',
         layout: 'modern',
         theme: 'default',
+        defaultHttpClient: {
+          targetKey: 'rust',
+          clientKey: 'reqwest'
+        },
+        expandAllResponses: true,
         persistAuth: false,
         telemetry: false,
         metaData: {
@@ -282,7 +287,14 @@ fn openapi_document() -> Value {
             "license": {
                 "name": "MIT OR Apache-2.0",
                 "identifier": "MIT OR Apache-2.0"
-            }
+            },
+            "x-scalar-sdk-installation": [
+                {
+                    "lang": "Rust",
+                    "description": "Install the typed Rust client from crates.io:",
+                    "source": "cargo add hinge-rs"
+                }
+            ]
         },
         "servers": [
             {
@@ -473,6 +485,7 @@ fn paths() -> Value {
                 "operationId": "connectSendbirdWebSocket",
                 "description": "Pseudo-operation documenting the Sendbird WebSocket handshake and typed events. The Rust client connects to wss://ws-{appId}.sendbird.com/.",
                 "security": [{"sendbirdWsAuth": []}],
+                "x-codeSamples": rust_code_samples("Connect Sendbird WebSocket"),
                 "responses": {
                     "101": {
                         "description": "WebSocket upgrade accepted"
@@ -951,7 +964,186 @@ fn operation_with_params(
         op["security"] = json!([]);
     }
 
+    let samples = rust_code_samples(summary);
+    if !samples.as_array().is_some_and(|items| items.is_empty()) {
+        op["x-codeSamples"] = samples;
+    }
+
     op
+}
+
+fn rust_code_samples(summary: &str) -> Value {
+    let Some(source) = rust_usage_source(summary) else {
+        return json!([]);
+    };
+    json!([
+        {
+            "lang": "Rust",
+            "label": "hinge-rs",
+            "source": source
+        }
+    ])
+}
+
+const CLIENT_SETUP_SAMPLE: &str = r#"let mut client = hinge_rs::Client::builder()
+    .phone_number("+15555550123")
+    .build()?;"#;
+
+const AUTHENTICATED_CLIENT_SETUP_SAMPLE: &str = r#"let mut client = hinge_rs::Client::builder()
+    .phone_number("+15555550123")
+    .build()?;
+client.persistence().load_session("session.json")?;"#;
+
+fn rust_usage_source(summary: &str) -> Option<String> {
+    let setup = if matches!(
+        summary,
+        "Initiate SMS login" | "Submit SMS OTP" | "Submit email 2FA code"
+    ) {
+        CLIENT_SETUP_SAMPLE
+    } else {
+        AUTHENTICATED_CLIENT_SETUP_SAMPLE
+    };
+    let body = rust_usage_body(summary)?;
+    Some(format!("{setup}\n\n{body}"))
+}
+
+fn rust_usage_body(summary: &str) -> Option<&'static str> {
+    match summary {
+        "Initiate SMS login" => Some(r#"client.auth().initiate_sms().await?;"#),
+        "Submit SMS OTP" => Some(
+            r#"let tokens = client.auth().submit_otp("123456").await?;
+client.persistence().save_session("session.json")?;"#,
+        ),
+        "Submit email 2FA code" => Some(
+            r#"let tokens = client
+    .auth()
+    .submit_email_code("case-id", "123456")
+    .await?;
+client.persistence().save_session("session.json")?;"#,
+        ),
+        "Get recommendations" => Some(r#"let recs = client.recommendations().get().await?;"#),
+        "Get public profiles" => Some(
+            r#"let profiles = client
+    .profiles()
+    .public(vec!["user_id".to_string()])
+    .await?;"#,
+        ),
+        "Get public profile content" => Some(
+            r#"let content = client
+    .profiles()
+    .public_content(vec!["user_id".to_string()])
+    .await?;"#,
+        ),
+        "Get self profile" => Some(r#"let profile = client.profiles().me().await?;"#),
+        "Get self content" => Some(r#"let content = client.profiles().content().await?;"#),
+        "Get self preferences" => {
+            Some(r#"let preferences = client.settings().preferences().await?;"#)
+        }
+        "Update self preferences" => Some(
+            r#"let response = client
+    .settings()
+    .update_preferences(preferences)
+    .await?;"#,
+        ),
+        "Update self profile" => {
+            Some(r#"let response = client.profiles().update(profile_update).await?;"#)
+        }
+        "Get like limit" => Some(r#"let limit = client.likes().limit().await?;"#),
+        "List likes" => Some(r#"let likes = client.likes().list().await?;"#),
+        "Get like subject" => Some(r#"let like = client.likes().subject("subject_id").await?;"#),
+        "Rate or skip user" => {
+            Some(r#"let response = client.ratings().rate_user(rate_input).await?;"#)
+        }
+        "Respond to rate" => {
+            Some(r#"let response = client.ratings().respond(rate_response).await?;"#)
+        }
+        "List prompts" => Some(r#"let prompts = client.prompts().list().await?;"#),
+        "Evaluate answer" => {
+            Some(r#"let review = client.prompts().evaluate_answer(payload).await?;"#)
+        }
+        "Create prompt poll" => {
+            Some(r#"let created = client.prompts().create_prompt_poll(payload).await?;"#)
+        }
+        "Create video prompt" => {
+            Some(r#"let created = client.prompts().create_video_prompt(payload).await?;"#)
+        }
+        "List connections" => Some(r#"let matches = client.connections().list().await?;"#),
+        "Get connection detail" => {
+            Some(r#"let detail = client.connections().detail("subject_id").await?;"#)
+        }
+        "Get match note" => {
+            Some(r#"let note = client.connections().match_note("subject_id").await?;"#)
+        }
+        "Get standouts" => Some(r#"let standouts = client.connections().standouts().await?;"#),
+        "Get content settings" => Some(r#"let settings = client.settings().content().await?;"#),
+        "Update content settings" => {
+            Some(r#"let response = client.settings().update_content(settings).await?;"#)
+        }
+        "Update answers" => {
+            Some(r#"let response = client.settings().update_answers(answers).await?;"#)
+        }
+        "Get auth settings" => Some(r#"let settings = client.settings().auth().await?;"#),
+        "Get notification settings" => {
+            Some(r#"let settings = client.settings().notifications().await?;"#)
+        }
+        "Get user traits" => Some(r#"let traits = client.settings().user_traits().await?;"#),
+        "Get account info" => Some(r#"let account = client.settings().account_info().await?;"#),
+        "Get export status" => Some(r#"let status = client.settings().export_status().await?;"#),
+        "Repeat profiles" => {
+            Some(r#"let repeated = client.recommendations().repeat_profiles().await?;"#)
+        }
+        "Authenticate Sendbird" => Some(r#"let credentials = client.chat().credentials().await?;"#),
+        "Review message text" => Some(
+            r#"let raw = client
+    .raw()
+    .hinge(
+        reqwest::Method::POST,
+        "/flag/textreview",
+        Some(serde_json::json!({
+            "text": "hey",
+            "receiverId": "user_id"
+        })),
+    )
+    .await?;"#,
+        ),
+        "Send Hinge message" => Some(r#"let sent = client.chat().send_message(payload).await?;"#),
+        "List my Sendbird channels" => Some(r#"let channels = client.chat().channels(30).await?;"#),
+        "Create Sendbird DM channel" => Some(
+            r#"let channel = client
+    .chat()
+    .get_or_create_dm_channel("self_user_id", "peer_user_id")
+    .await?;"#,
+        ),
+        "Get Sendbird channel" => Some(
+            r#"let channel = client
+    .chat()
+    .channel("sendbird_group_channel")
+    .await?;"#,
+        ),
+        "Get Sendbird messages" => Some(
+            r#"let messages = client
+    .chat()
+    .full_messages("sendbird_group_channel")
+    .await?;"#,
+        ),
+        "Export chat helper" => Some(
+            r#"let result = client
+    .chat()
+    .export_chat(hinge_rs::models::ExportChatInput {
+        channel_url: "sendbird_group_channel".to_string(),
+        output_dir: "exports/chat".to_string(),
+        include_media: true,
+        initiation_summary_lines: None,
+    })
+    .await?;"#,
+        ),
+        "Connect Sendbird WebSocket" => Some(
+            r#"let mut events = client.chat().subscribe_events().await?;
+let event = events.recv().await?;
+println!("{event:?}");"#,
+        ),
+        _ => None,
+    }
 }
 
 fn operation_id(summary: &str) -> String {
@@ -1101,6 +1293,7 @@ mod tests {
     fn spec_contains_scalar_environment_and_chat_paths() {
         let spec = openapi_document();
         assert!(spec.get("x-scalar-environments").is_some());
+        assert!(spec["info"].get("x-scalar-sdk-installation").is_some());
         assert!(spec["paths"].get("/message/send").is_some());
         assert!(spec["paths"].get("/flag/textreview").is_some());
         assert_eq!(
@@ -1224,6 +1417,31 @@ mod tests {
         let actual =
             fs::read_to_string(artifact_path).expect("generated versions should be readable");
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn every_operation_has_operation_id_and_rust_samples() {
+        let spec = openapi_document();
+        let mut operations = 0usize;
+        let mut operations_with_samples = 0usize;
+        for path in spec["paths"].as_object().expect("paths object").values() {
+            for operation in path.as_object().expect("path item").values() {
+                operations += 1;
+                assert!(
+                    operation.get("operationId").is_some(),
+                    "operation missing operationId: {operation:#}"
+                );
+                if operation
+                    .get("x-codeSamples")
+                    .and_then(|samples| samples.as_array())
+                    .is_some_and(|samples| !samples.is_empty())
+                {
+                    operations_with_samples += 1;
+                }
+            }
+        }
+        assert_eq!(operations, 44);
+        assert_eq!(operations_with_samples, 42);
     }
 
     fn has_defs_key(value: &Value) -> bool {
