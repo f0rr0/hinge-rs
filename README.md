@@ -5,7 +5,7 @@
 [![CI](https://github.com/f0rr0/hinge-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/f0rr0/hinge-rs/actions/workflows/ci.yml)
 [![API Reference](https://github.com/f0rr0/hinge-rs/actions/workflows/docs.yml/badge.svg)](https://f0rr0.github.io/hinge-rs/)
 [![MSRV](https://img.shields.io/badge/msrv-1.88-blue)](https://www.rust-lang.org)
-[![License](https://img.shields.io/crates/l/hinge-rs)](LICENSE-MIT)
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](https://github.com/f0rr0/hinge-rs#license)
 
 Unofficial, typed Rust client for Hinge APIs, including Sendbird chat.
 
@@ -53,3 +53,7 @@ async fn main() -> Result<(), hinge_rs::errors::HingeError> {
 ## Status
 
 Early OSS extraction. Unofficial and not affiliated with Hinge, Match Group, or Sendbird.
+
+## License
+
+Licensed under either [MIT](https://github.com/f0rr0/hinge-rs/blob/main/LICENSE-MIT) or [Apache-2.0](https://github.com/f0rr0/hinge-rs/blob/main/LICENSE-APACHE).
