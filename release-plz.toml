@@ -1,0 +1,27 @@
+[workspace]
+changelog_update = true
+git_release_enable = true
+git_tag_enable = true
+git_tag_name = "v{{ version }}"
+publish = true
+publish_all_features = true
+release_always = false
+release_commits = "^(feat|fix|perf|refactor|security)[(:]|^build\\(deps\\):|^[a-zA-Z]+(\\([^)]+\\))?!:"
+semver_check = true
+
+[[package]]
+name = "hinge-rs"
+changelog_path = "CHANGELOG.md"
+
+[changelog]
+protect_breaking_commits = true
+commit_parsers = [
+  { message = "^feat", group = "added" },
+  { message = "^fix", group = "fixed" },
+  { message = "^perf", group = "changed" },
+  { message = "^refactor", group = "changed" },
+  { message = "^security", group = "security" },
+  { message = "^build\\(deps\\)", group = "changed" },
+  { message = "^(docs|style|test|ci|chore|build)(\\(.+\\))?:", skip = true },
+  { message = "^.*", group = "changed" },
+]

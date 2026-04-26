@@ -1,0 +1,25 @@
+pub mod auth;
+pub mod chat;
+pub mod client;
+pub mod connections;
+pub mod likes;
+pub mod persistence;
+pub mod profiles;
+pub mod prompts;
+pub mod ratings;
+pub mod raw;
+pub mod recommendations;
+pub mod settings;
+
+pub use auth::AuthApi;
+pub use chat::ChatApi;
+pub use client::{Client, ClientBuilder, Config, DeviceProfile, Session};
+pub use connections::ConnectionsApi;
+pub use likes::LikesApi;
+pub use persistence::PersistenceApi;
+pub use profiles::ProfilesApi;
+pub use prompts::PromptsApi;
+pub use ratings::RatingsApi;
+pub use raw::RawApi;
+pub use recommendations::RecommendationsApi;
+pub use settings::SettingsApi;

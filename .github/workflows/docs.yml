@@ -1,0 +1,68 @@
+name: Docs
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/docs.yml"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "docs/api/**"
+      - "openapi/**"
+      - "src/**"
+      - "xtask/**"
+  workflow_dispatch:
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build API reference
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            xtask -> target
+
+      - name: Generate OpenAPI and Scalar docs
+        run: cargo run --locked --manifest-path xtask/Cargo.toml -- openapi
+
+      - name: Validate generated docs are committed
+        run: |
+          git diff --exit-code -- \
+            openapi/hinge-api.openapi.json \
+            docs/api/openapi.json \
+            docs/api/index.html
+
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/api
+
+  deploy:
+    name: Deploy API reference
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
