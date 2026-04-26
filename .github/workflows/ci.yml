@@ -1,0 +1,258 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  workflow-lint:
+    name: Workflow lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Lint GitHub Actions workflows
+        uses: raven-actions/actionlint@v2.1.2
+
+  hygiene:
+    name: Hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: taiki-e/install-action@prek
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            xtask -> target
+
+      - name: Validate prek hooks
+        run: prek validate-config prek.toml
+
+      - name: Run pre-commit hook set
+        run: prek run --all-files --stage pre-commit
+
+      - name: Format
+        run: |
+          cargo fmt -- --check
+          cargo fmt --manifest-path xtask/Cargo.toml -- --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+  commit-policy:
+    name: Commit policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/checkout@v6
+        if: github.event_name != 'pull_request'
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Determine commit range
+        id: commit-range
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+            echo "commits=origin/${BASE_REF}..HEAD" >> "$GITHUB_OUTPUT"
+          elif [[ "$EVENT_NAME" == "push" ]]; then
+            commit_count="$(jq '.commits // [] | length' "$GITHUB_EVENT_PATH")"
+            if [[ "$commit_count" -gt 0 ]] && git rev-parse "HEAD~${commit_count}" >/dev/null 2>&1; then
+              echo "commits=HEAD~${commit_count}..HEAD" >> "$GITHUB_OUTPUT"
+            else
+              echo "commits=HEAD" >> "$GITHUB_OUTPUT"
+            fi
+          elif git rev-parse HEAD^ >/dev/null 2>&1; then
+            echo "commits=HEAD^..HEAD" >> "$GITHUB_OUTPUT"
+          else
+            echo "commits=HEAD" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check Conventional Commits
+        uses: crate-ci/committed@v1.1.11
+        with:
+          commits: ${{ steps.commit-range.outputs.commits }}
+          args: --no-merge-commit --config committed.toml
+
+  test:
+    name: Test (${{ matrix.toolchain }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain:
+          - stable
+          - "1.88.0"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.toolchain }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: test-${{ matrix.toolchain }}
+          workspaces: |
+            . -> target
+            xtask -> target
+
+      - name: Check all features
+        run: cargo check --all-features
+
+      - name: Test crate
+        run: cargo test --locked
+
+      - name: Test xtask
+        run: cargo test --locked --manifest-path xtask/Cargo.toml
+
+  package:
+    name: Package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Verify crate package
+        run: cargo package --locked
+
+  feature-powerset:
+    name: Feature powerset
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@cargo-hack
+
+      - name: Check feature combinations
+        run: cargo hack check --feature-powerset --no-dev-deps
+
+  docs:
+    name: OpenAPI and Scalar docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            xtask -> target
+
+      - name: Generate OpenAPI and Scalar docs
+        run: cargo run --locked --manifest-path xtask/Cargo.toml -- openapi
+
+      - name: Test xtask
+        run: cargo test --locked --manifest-path xtask/Cargo.toml
+
+      - name: Validate generated docs are committed
+        run: |
+          git diff --exit-code -- \
+            openapi/hinge-api.openapi.json \
+            docs/api/openapi.json \
+            docs/api/index.html
+
+  dependency-policy:
+    name: cargo-deny (${{ matrix.checks }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        checks:
+          - advisories
+          - bans
+          - licenses
+          - sources
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check ${{ matrix.checks }}
+
+  semver:
+    name: Public API compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Detect published crate
+        id: published
+        run: |
+          if cargo search hinge-rs --limit 1 | grep -q '^hinge-rs = '; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check semver compatibility
+        if: steps.published.outputs.exists == 'true'
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+
+      - name: Skip before first publish
+        if: steps.published.outputs.exists != 'true'
+        run: echo "hinge-rs is not published yet; semver baseline will activate after the first release."
+
+  required:
+    name: Required checks
+    if: always()
+    needs:
+      - workflow-lint
+      - hygiene
+      - commit-policy
+      - test
+      - package
+      - feature-powerset
+      - docs
+      - dependency-policy
+      - semver
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any required job did not pass
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')
+        run: exit 1
+
+      - name: All required jobs passed
+        run: echo "All required CI jobs passed."
