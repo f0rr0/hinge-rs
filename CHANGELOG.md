@@ -7,6 +7,12 @@ version bumps, changelog updates, GitHub releases, and crates.io publishing.
 
 ## Unreleased
 
+## [0.1.1](https://github.com/f0rr0/hinge-rs/compare/v0.1.0...v0.1.1) - 2026-04-26
+
+### Changed
+
+- organize client internals ([#7](https://github.com/f0rr0/hinge-rs/pull/7))
+
 ## [0.1.0](https://github.com/f0rr0/hinge-rs/releases/tag/v0.1.0) - 2026-04-26
 
 ### Added

@@ -22,6 +22,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
+  actions: write
   contents: write
   pull-requests: write
   id-token: write
@@ -68,11 +69,52 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
-      - uses: release-plz/action@v0.5
+      - id: release-plz
+        uses: release-plz/action@v0.5
         with:
           command: release-pr
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Refresh generated release PR artifacts
+        if: steps.release-plz.outputs.pr != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ steps.release-plz.outputs.pr }}
+        run: |
+          set -euo pipefail
+
+          pr_number="$(jq -r '.number // empty' <<<"$PR")"
+          head_branch="$(jq -r '.head_branch // empty' <<<"$PR")"
+          if [[ -z "$pr_number" || -z "$head_branch" ]]; then
+            echo "release-plz did not return a release PR"
+            exit 0
+          fi
+
+          gh pr checkout "$pr_number"
+
+          cargo generate-lockfile --manifest-path xtask/Cargo.toml
+          cargo run --locked --manifest-path xtask/Cargo.toml -- openapi
+
+          generated_paths=(
+            xtask/Cargo.lock
+            openapi/hinge-api.openapi.json
+            docs/api/openapi.json
+            docs/api/index.html
+            docs/api/versions.json
+          )
+
+          if git diff --quiet -- "${generated_paths[@]}"; then
+            echo "release PR generated artifacts are already current"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add "${generated_paths[@]}"
+            git commit -m "chore: update generated release artifacts"
+            git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:${head_branch}"
+          fi
+
+          gh workflow run ci.yml --ref "$head_branch"
 
   release-dry-run:
     name: Dry-run release
