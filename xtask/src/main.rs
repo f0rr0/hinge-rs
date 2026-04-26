@@ -1,6 +1,7 @@
 #![recursion_limit = "512"]
 
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -279,7 +280,8 @@ fn openapi_document() -> Value {
             "version": hinge_rs::VERSION,
             "description": "Unofficial typed Hinge REST and Sendbird chat API surface generated from hinge-rs.",
             "license": {
-                "name": "MIT OR Apache-2.0"
+                "name": "MIT OR Apache-2.0",
+                "identifier": "MIT OR Apache-2.0"
             }
         },
         "servers": [
@@ -322,17 +324,17 @@ fn openapi_document() -> Value {
             }
         },
         "tags": [
-            {"name": "Auth"},
-            {"name": "Recommendations"},
-            {"name": "Profiles"},
-            {"name": "Likes"},
-            {"name": "Ratings"},
-            {"name": "Prompts"},
-            {"name": "Connections"},
-            {"name": "Settings"},
-            {"name": "Chat"},
-            {"name": "Sendbird REST"},
-            {"name": "Sendbird WebSocket"}
+            {"name": "Auth", "description": "Device install, SMS OTP, email 2FA, and auth settings."},
+            {"name": "Recommendations", "description": "Recommendation feeds, standouts, and repeat profiles."},
+            {"name": "Profiles", "description": "Self, public, and profile-content APIs."},
+            {"name": "Likes", "description": "Inbound likes, like limits, and like subject lookup."},
+            {"name": "Ratings", "description": "Like, note, superlike, skip, and response flows."},
+            {"name": "Prompts", "description": "Prompt catalog and prompt-content creation."},
+            {"name": "Connections", "description": "Matches, connection detail, and match notes."},
+            {"name": "Settings", "description": "Preferences, notifications, user traits, account, and export status."},
+            {"name": "Chat", "description": "Hinge chat helpers and local export support."},
+            {"name": "Sendbird REST", "description": "Sendbird channel, message, and group-channel endpoints used by Hinge chat."},
+            {"name": "Sendbird WebSocket", "description": "Documented Sendbird WebSocket handshake and typed frame events."}
         ],
         "paths": paths(),
         "components": components()
@@ -468,12 +470,14 @@ fn paths() -> Value {
             "get": {
                 "tags": ["Sendbird WebSocket"],
                 "summary": "Connect Sendbird WebSocket",
+                "operationId": "connectSendbirdWebSocket",
                 "description": "Pseudo-operation documenting the Sendbird WebSocket handshake and typed events. The Rust client connects to wss://ws-{appId}.sendbird.com/.",
                 "security": [{"sendbirdWsAuth": []}],
                 "responses": {
                     "101": {
                         "description": "WebSocket upgrade accepted"
-                    }
+                    },
+                    "401": error_response("Unauthorized")
                 },
                 "x-websocket-events": {
                     "client": ["READ", "PING", "TPST", "TPEN", "ENTR", "EXIT", "MACK", "CLOSE"],
@@ -712,6 +716,8 @@ fn schemas() -> Value {
     add_schema!(VoiceAnswerPayload);
     add_schema!(SendbirdWsEvent);
 
+    flatten_component_defs(&mut schemas);
+
     Value::Object(schemas)
 }
 
@@ -731,10 +737,10 @@ fn strip_schema_meta(schema: &mut Value) {
 fn rewrite_local_schema_refs(schema: &mut Value, component_name: &str) {
     match schema {
         Value::Object(map) => {
-            if let Some(Value::String(reference)) = map.get_mut("$ref") {
-                if let Some(suffix) = reference.strip_prefix("#/$defs/") {
-                    *reference = format!("#/components/schemas/{component_name}/$defs/{suffix}");
-                }
+            if let Some(Value::String(reference)) = map.get_mut("$ref")
+                && let Some(suffix) = reference.strip_prefix("#/$defs/")
+            {
+                *reference = format!("#/components/schemas/{component_name}/$defs/{suffix}");
             }
             for value in map.values_mut() {
                 rewrite_local_schema_refs(value, component_name);
@@ -743,6 +749,79 @@ fn rewrite_local_schema_refs(schema: &mut Value, component_name: &str) {
         Value::Array(values) => {
             for value in values {
                 rewrite_local_schema_refs(value, component_name);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn flatten_component_defs(schemas: &mut Map<String, Value>) {
+    let mut component_defs = Vec::new();
+    for component_name in schemas.keys().cloned().collect::<Vec<_>>() {
+        let Some(schema) = schemas.get_mut(&component_name) else {
+            continue;
+        };
+        let Some(defs) = take_component_defs(schema) else {
+            continue;
+        };
+        component_defs.push((component_name, defs));
+    }
+
+    let mut ref_rewrites = BTreeMap::new();
+    let mut pending_schemas = BTreeMap::new();
+
+    for (component_name, defs) in component_defs {
+        for (def_name, def_schema) in defs {
+            let target_name = def_name.clone();
+            ref_rewrites.insert(
+                format!("#/components/schemas/{component_name}/$defs/{def_name}"),
+                format!("#/components/schemas/{target_name}"),
+            );
+
+            if !schemas.contains_key(&target_name) {
+                pending_schemas.entry(target_name).or_insert(def_schema);
+            }
+        }
+    }
+
+    for (name, schema) in pending_schemas {
+        schemas.entry(name).or_insert(schema);
+    }
+
+    for schema in schemas.values_mut() {
+        rewrite_schema_refs(schema, &ref_rewrites);
+    }
+}
+
+fn take_component_defs(schema: &mut Value) -> Option<Map<String, Value>> {
+    let Value::Object(map) = schema else {
+        return None;
+    };
+    match map.remove("$defs") {
+        Some(Value::Object(defs)) => Some(defs),
+        Some(defs) => {
+            map.insert("$defs".to_string(), defs);
+            None
+        }
+        None => None,
+    }
+}
+
+fn rewrite_schema_refs(schema: &mut Value, ref_rewrites: &BTreeMap<String, String>) {
+    match schema {
+        Value::Object(map) => {
+            if let Some(Value::String(reference)) = map.get_mut("$ref")
+                && let Some(replacement) = ref_rewrites.get(reference)
+            {
+                *reference = replacement.clone();
+            }
+            for value in map.values_mut() {
+                rewrite_schema_refs(value, ref_rewrites);
+            }
+        }
+        Value::Array(values) => {
+            for value in values {
+                rewrite_schema_refs(value, ref_rewrites);
             }
         }
         _ => {}
@@ -815,23 +894,28 @@ fn operation_with_params(
     response_schema: Option<Value>,
     hinge_auth: bool,
 ) -> Value {
+    let mut response_media = json!({
+        "schema": response_schema.unwrap_or_else(|| schema_ref("EmptyObject"))
+    });
+    if let Some(example) = example_for(summary) {
+        response_media["examples"] = json!({
+            "success": {
+                "value": example
+            }
+        });
+    }
+
     let mut op = json!({
         "tags": [tag],
         "summary": summary,
+        "operationId": operation_id(summary),
         "description": description,
         "parameters": parameters,
         "responses": {
             "200": {
                 "description": "Success",
                 "content": {
-                    "application/json": {
-                        "schema": response_schema.unwrap_or_else(|| schema_ref("EmptyObject")),
-                        "examples": {
-                            "success": {
-                                "value": example_for(summary)
-                            }
-                        }
-                    }
+                    "application/json": response_media
                 }
             },
             "400": error_response("Bad request"),
@@ -842,26 +926,53 @@ fn operation_with_params(
     });
 
     if let Some(schema) = request_schema {
+        let mut request_media = json!({
+            "schema": schema
+        });
+        if let Some(example) = request_example(summary) {
+            request_media["examples"] = json!({
+                "request": {
+                    "value": example
+                }
+            });
+        }
+
         op["requestBody"] = json!({
             "required": true,
             "content": {
-                "application/json": {
-                    "schema": schema,
-                    "examples": {
-                        "request": {
-                            "value": request_example(summary)
-                        }
-                    }
-                }
+                "application/json": request_media
             }
         });
     }
 
     if hinge_auth {
         op["security"] = json!([{"bearerAuth": []}]);
+    } else {
+        op["security"] = json!([]);
     }
 
     op
+}
+
+fn operation_id(summary: &str) -> String {
+    let mut words = summary
+        .split(|character: char| !character.is_ascii_alphanumeric())
+        .filter(|word| !word.is_empty());
+
+    let Some(first_word) = words.next() else {
+        return "operation".to_string();
+    };
+
+    let mut operation_id = first_word.to_ascii_lowercase();
+    for word in words {
+        let word = word.to_ascii_lowercase();
+        let mut chars = word.chars();
+        if let Some(first_character) = chars.next() {
+            operation_id.extend(first_character.to_uppercase());
+            operation_id.push_str(chars.as_str());
+        }
+    }
+    operation_id
 }
 
 fn schema_ref(name: &str) -> Value {
@@ -932,35 +1043,37 @@ fn generic_object(description: &str) -> Value {
     })
 }
 
-fn request_example(summary: &str) -> Value {
+fn request_example(summary: &str) -> Option<Value> {
     match summary {
-        "Register device install" => json!({"installId": "00000000-0000-0000-0000-000000000000"}),
-        "Initiate SMS login" => {
-            json!({"deviceId": "00000000-0000-0000-0000-000000000000", "phoneNumber": "+15555550123"})
+        "Register device install" => {
+            Some(json!({"installId": "00000000-0000-0000-0000-000000000000"}))
         }
-        "Submit SMS OTP" => {
-            json!({"installId": "00000000-0000-0000-0000-000000000000", "deviceId": "00000000-0000-0000-0000-000000000000", "phoneNumber": "+15555550123", "otp": "123456"})
-        }
+        "Initiate SMS login" => Some(
+            json!({"deviceId": "00000000-0000-0000-0000-000000000000", "phoneNumber": "+15555550123"}),
+        ),
+        "Submit SMS OTP" => Some(
+            json!({"installId": "00000000-0000-0000-0000-000000000000", "deviceId": "00000000-0000-0000-0000-000000000000", "phoneNumber": "+15555550123", "otp": "123456"}),
+        ),
         "Get recommendations" => {
-            json!({"playerId": "user_123", "newHere": false, "activeToday": false})
+            Some(json!({"playerId": "user_123", "newHere": false, "activeToday": false}))
         }
-        "Authenticate Sendbird" => json!({"refresh": false}),
-        "Review message text" => json!({"text": "hey", "receiverId": "user_456"}),
-        "Send Hinge message" => json!({
+        "Authenticate Sendbird" => Some(json!({"refresh": false})),
+        "Review message text" => Some(json!({"text": "hey", "receiverId": "user_456"})),
+        "Send Hinge message" => Some(json!({
             "ays": false,
             "matchMessage": true,
             "messageType": "text",
             "messageData": {"message": "hello"},
             "subjectId": "user_456",
             "origin": "connection"
-        }),
-        _ => json!({}),
+        })),
+        _ => None,
     }
 }
 
-fn example_for(summary: &str) -> Value {
+fn example_for(summary: &str) -> Option<Value> {
     match summary {
-        "Submit SMS OTP" => json!({
+        "Submit SMS OTP" => Some(json!({
             "hingeAuthToken": {
                 "identityId": "user_123",
                 "token": "[redacted]",
@@ -970,13 +1083,13 @@ fn example_for(summary: &str) -> Value {
                 "token": "[redacted]",
                 "expires": "2026-04-26T00:00:00Z"
             }
-        }),
-        "Get like limit" => json!({"likes": 8, "superlikes": 1}),
-        "Get match note" => json!({"note": "Liked your prompt"}),
+        })),
+        "Get like limit" => Some(json!({"likes": 8, "superlikes": 1})),
+        "Get match note" => Some(json!({"note": "Liked your prompt"})),
         "Authenticate Sendbird" => {
-            json!({"token": "[redacted]", "expires": "2026-04-26T00:00:00Z"})
+            Some(json!({"token": "[redacted]", "expires": "2026-04-26T00:00:00Z"}))
         }
-        _ => json!({}),
+        _ => None,
     }
 }
 
@@ -990,6 +1103,14 @@ mod tests {
         assert!(spec.get("x-scalar-environments").is_some());
         assert!(spec["paths"].get("/message/send").is_some());
         assert!(spec["paths"].get("/flag/textreview").is_some());
+        assert_eq!(
+            spec["paths"]["/identity/install"]["post"]["security"],
+            json!([])
+        );
+        assert_eq!(
+            spec["paths"]["/rec/v2"]["post"]["operationId"],
+            "getRecommendations"
+        );
         assert!(
             spec["paths"]
                 .get("/users/{userId}/my_group_channels")
@@ -1062,6 +1183,36 @@ mod tests {
     }
 
     #[test]
+    fn generated_openapi_uses_scalar_renderable_response_schemas() {
+        let spec = openapi_document();
+
+        assert!(
+            !has_defs_key(&spec),
+            "OpenAPI components should not keep $defs"
+        );
+        assert!(
+            !has_defs_ref(&spec),
+            "OpenAPI refs should not point into nested $defs"
+        );
+
+        let rec_media =
+            &spec["paths"]["/rec/v2"]["post"]["responses"]["200"]["content"]["application/json"];
+        assert_eq!(
+            rec_media["schema"]["$ref"],
+            "#/components/schemas/RecommendationsResponse"
+        );
+        assert!(
+            rec_media.get("examples").is_none(),
+            "unknown examples should be omitted instead of showing empty objects"
+        );
+        assert_eq!(
+            spec["components"]["schemas"]["RecommendationsResponse"]["properties"]["feeds"]["items"]
+                ["$ref"],
+            "#/components/schemas/RecommendationsFeed"
+        );
+    }
+
+    #[test]
     fn generated_versions_artifact_is_stable() {
         let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .parent()
@@ -1073,5 +1224,28 @@ mod tests {
         let actual =
             fs::read_to_string(artifact_path).expect("generated versions should be readable");
         assert_eq!(actual, expected);
+    }
+
+    fn has_defs_key(value: &Value) -> bool {
+        match value {
+            Value::Object(map) => map.contains_key("$defs") || map.values().any(has_defs_key),
+            Value::Array(values) => values.iter().any(has_defs_key),
+            _ => false,
+        }
+    }
+
+    fn has_defs_ref(value: &Value) -> bool {
+        match value {
+            Value::Object(map) => {
+                if let Some(Value::String(reference)) = map.get("$ref")
+                    && reference.contains("/$defs/")
+                {
+                    return true;
+                }
+                map.values().any(has_defs_ref)
+            }
+            Value::Array(values) => values.iter().any(has_defs_ref),
+            _ => false,
+        }
     }
 }
