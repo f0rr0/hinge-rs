@@ -48,6 +48,7 @@ async fn main() -> Result<(), hinge_rs::errors::HingeError> {
 
 - Rust API docs: <https://docs.rs/hinge-rs>
 - API reference: <https://f0rr0.github.io/hinge-rs/>
+- Release snapshots use `/v/<version>/` paths.
 
 ## Status
 

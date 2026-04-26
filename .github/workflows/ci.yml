@@ -24,6 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Lint GitHub Actions workflows
@@ -35,6 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -169,6 +171,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -188,7 +191,11 @@ jobs:
           git diff --exit-code -- \
             openapi/hinge-api.openapi.json \
             docs/api/openapi.json \
-            docs/api/index.html
+            docs/api/index.html \
+            docs/api/versions.json
+
+      - name: Build versioned Pages artifact
+        run: scripts/build-pages.sh "$RUNNER_TEMP/pages"
 
   dependency-policy:
     name: cargo-deny (${{ matrix.checks }})
