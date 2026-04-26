@@ -34,33 +34,20 @@ default = ["rustls"]
 rustls = ["reqwest/rustls", "tokio-tungstenite/rustls-tls-webpki-roots"]
 native-tls = ["reqwest/native-tls", "tokio-tungstenite/native-tls"]
 json-schema = ["dep:schemars"]
-openapi = ["dep:schemars", "dep:utoipa", "json-schema"]
+openapi = ["json-schema"]
 
 [dependencies]
 anyhow = "1.0"
-bon = "3.9"
 chrono = { version = "0.4", features = ["serde"] }
 futures-util = "0.3"
-governor = "0.10"
 log = "0.4"
-nutype = { version = "0.7", features = ["serde"] }
 reqwest = { version = "0.13", default-features = false, features = ["json", "query", "gzip", "brotli", "deflate", "http2"] }
-secrecy = { version = "0.10", features = ["serde"] }
 schemars = { version = "1.2", features = ["chrono04", "uuid1"], optional = true }
+secrecy = { version = "0.10", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_path_to_error = "0.1"
-serde_with = "3.15"
 thiserror = "2.0"
 tokio = { version = "1.52", features = ["rt-multi-thread", "macros", "sync", "time"] }
-tokio-stream = "0.1"
 tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect", "handshake"] }
-tracing = "0.1"
-url = "2.5"
-utoipa = { version = "5.4", optional = true }
 uuid = { version = "1.18", features = ["v4", "serde"] }
-
-[dev-dependencies]
-insta = { version = "1.47", features = ["json"] }
-proptest = "1.11"
-wiremock = "0.6"

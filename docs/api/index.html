@@ -62,6 +62,11 @@
         url: './openapi.json',
         layout: 'modern',
         theme: 'default',
+        defaultHttpClient: {
+          targetKey: 'rust',
+          clientKey: 'reqwest'
+        },
+        expandAllResponses: true,
         persistAuth: false,
         telemetry: false,
         metaData: {
