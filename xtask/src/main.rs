@@ -255,10 +255,7 @@ fn scalar_index_html(config: &ScalarPageConfig) -> Result<String, serde_json::Er
         url: './openapi.json',
         layout: 'modern',
         theme: 'default',
-        defaultHttpClient: {
-          targetKey: 'rust',
-          clientKey: 'reqwest'
-        },
+        hiddenClients: true,
         expandAllResponses: true,
         persistAuth: false,
         telemetry: false,
@@ -997,7 +994,10 @@ client.persistence().load_session("session.json")?;"#;
 fn rust_usage_source(summary: &str) -> Option<String> {
     let setup = if matches!(
         summary,
-        "Initiate SMS login" | "Submit SMS OTP" | "Submit email 2FA code"
+        "Register device install"
+            | "Initiate SMS login"
+            | "Submit SMS OTP"
+            | "Submit email 2FA code"
     ) {
         CLIENT_SETUP_SAMPLE
     } else {
@@ -1009,6 +1009,17 @@ fn rust_usage_source(summary: &str) -> Option<String> {
 
 fn rust_usage_body(summary: &str) -> Option<&'static str> {
     match summary {
+        "Register device install" => Some(
+            r#"let install_id = client.session().device.install_id;
+let response = client
+    .raw()
+    .hinge(
+        reqwest::Method::POST,
+        "/identity/install",
+        Some(serde_json::json!({ "installId": install_id })),
+    )
+    .await?;"#,
+        ),
         "Initiate SMS login" => Some(r#"client.auth().initiate_sms().await?;"#),
         "Submit SMS OTP" => Some(
             r#"let tokens = client.auth().submit_otp("123456").await?;
@@ -1048,6 +1059,12 @@ client.persistence().save_session("session.json")?;"#,
         "Update self profile" => {
             Some(r#"let response = client.profiles().update(profile_update).await?;"#)
         }
+        "Delete content" => Some(
+            r#"client
+    .profiles()
+    .delete_content(vec!["content_id".to_string()])
+    .await?;"#,
+        ),
         "Get like limit" => Some(r#"let limit = client.likes().limit().await?;"#),
         "List likes" => Some(r#"let likes = client.likes().list().await?;"#),
         "Get like subject" => Some(r#"let like = client.likes().subject("subject_id").await?;"#),
@@ -1332,6 +1349,8 @@ mod tests {
         .expect("scalar html should render");
         assert!(html.contains("@scalar/api-reference"));
         assert!(html.contains("url: './openapi.json'"));
+        assert!(html.contains("hiddenClients: true"));
+        assert!(!html.contains("defaultHttpClient"));
         assert!(html.contains("version-select"));
         assert!(html.contains("./versions.json"));
     }
@@ -1441,7 +1460,7 @@ mod tests {
             }
         }
         assert_eq!(operations, 44);
-        assert_eq!(operations_with_samples, 42);
+        assert_eq!(operations_with_samples, operations);
     }
 
     fn has_defs_key(value: &Value) -> bool {

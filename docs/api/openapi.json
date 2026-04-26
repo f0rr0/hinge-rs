@@ -5962,6 +5962,13 @@
         "summary": "Delete content",
         "tags": [
           "Profiles"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\nclient.persistence().load_session(\"session.json\")?;\n\nclient\n    .profiles()\n    .delete_content(vec![\"content_id\".to_string()])\n    .await?;"
+          }
         ]
       }
     },
@@ -7318,6 +7325,13 @@
         "summary": "Register device install",
         "tags": [
           "Auth"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "hinge-rs",
+            "lang": "Rust",
+            "source": "let mut client = hinge_rs::Client::builder()\n    .phone_number(\"+15555550123\")\n    .build()?;\n\nlet install_id = client.session().device.install_id;\nlet response = client\n    .raw()\n    .hinge(\n        reqwest::Method::POST,\n        \"/identity/install\",\n        Some(serde_json::json!({ \"installId\": install_id })),\n    )\n    .await?;"
+          }
         ]
       }
     },
