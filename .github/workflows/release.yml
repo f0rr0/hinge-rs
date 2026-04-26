@@ -76,8 +76,9 @@ jobs:
       - name: Verify crate package
         run: cargo package --locked
 
-  release:
-    name: release-plz ${{ inputs.command }}
+  release-pr:
+    name: Create or update release PR
+    if: inputs.command == 'release-pr'
     needs: verify
     runs-on: ubuntu-latest
     steps:
@@ -88,32 +89,52 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
-      - name: Create or update release PR
-        if: inputs.command == 'release-pr'
-        uses: release-plz/action@v0.5
+      - uses: release-plz/action@v0.5
         with:
           command: release-pr
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Dry-run release
-        if: inputs.command == 'release' && inputs['dry-run']
-        uses: release-plz/action@v0.5
+  release-dry-run:
+    name: Dry-run release
+    if: inputs.command == 'release' && inputs['dry-run']
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: release-plz/action@v0.5
         with:
           command: release
           dry_run: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
-      - name: Publish release
-        if: inputs.command == 'release' && !inputs['dry-run']
-        uses: release-plz/action@v0.5
+  release:
+    name: Publish release
+    if: inputs.command == 'release' && !inputs['dry-run']
+    needs: verify
+    runs-on: ubuntu-latest
+    environment:
+      name: crates-io
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: release-plz/action@v0.5
         with:
           command: release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
   deploy-docs:
     name: Deploy versioned docs
