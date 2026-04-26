@@ -10,6 +10,7 @@ on:
       - "Cargo.toml"
       - "docs/api/**"
       - "openapi/**"
+      - "scripts/build-pages.sh"
       - "src/**"
       - "xtask/**"
   workflow_dispatch:
@@ -33,6 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -49,14 +51,18 @@ jobs:
           git diff --exit-code -- \
             openapi/hinge-api.openapi.json \
             docs/api/openapi.json \
-            docs/api/index.html
+            docs/api/index.html \
+            docs/api/versions.json
+
+      - name: Build versioned Pages artifact
+        run: scripts/build-pages.sh "$RUNNER_TEMP/pages"
 
       - uses: actions/configure-pages@v6
         with:
           enablement: true
       - uses: actions/upload-pages-artifact@v5
         with:
-          path: docs/api
+          path: ${{ runner.temp }}/pages
 
   deploy:
     name: Deploy API reference

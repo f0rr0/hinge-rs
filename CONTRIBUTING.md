@@ -18,6 +18,7 @@ Generated API reference artifacts must be committed when API docs change:
 - `openapi/hinge-api.openapi.json`
 - `docs/api/openapi.json`
 - `docs/api/index.html`
+- `docs/api/versions.json`
 
 ## Git Hooks
 
@@ -89,7 +90,9 @@ Releases are manual GitHub Actions runs:
    crate, tag the commit, and create the GitHub release.
 
 The **Docs** workflow deploys the generated Scalar API reference to GitHub Pages
-after relevant changes land on `main`.
+after relevant changes land on `main`. The root page is latest, and release
+snapshots are generated from git tags under `/v/<version>/` during docs and
+release deployment. Historical snapshots are not committed to `main`.
 
 For the first crates.io publish, configure `CARGO_REGISTRY_TOKEN` in the GitHub
 repository secrets. The workflow also grants `id-token: write` so the project

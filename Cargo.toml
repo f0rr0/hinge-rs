@@ -21,6 +21,7 @@ include = [
   "openapi/hinge-api.openapi.json",
   "docs/api/openapi.json",
   "docs/api/index.html",
+  "docs/api/versions.json",
 ]
 
 [package.metadata.docs.rs]

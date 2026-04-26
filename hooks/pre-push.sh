@@ -9,4 +9,5 @@ cargo run --locked --manifest-path xtask/Cargo.toml -- openapi
 git diff --exit-code -- \
   openapi/hinge-api.openapi.json \
   docs/api/openapi.json \
-  docs/api/index.html
+  docs/api/index.html \
+  docs/api/versions.json

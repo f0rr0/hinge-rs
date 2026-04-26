@@ -9,5 +9,7 @@ pub mod settings;
 pub mod storage;
 pub mod ws;
 
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 pub use api::{Client, ClientBuilder, Config, DeviceProfile, Session};
 pub use ws::{SendbirdWsEvent, SendbirdWsSubscription, parse_sendbird_ws_frame};

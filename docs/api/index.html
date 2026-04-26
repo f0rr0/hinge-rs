@@ -8,12 +8,56 @@
       body {
         margin: 0;
       }
+      .version-picker {
+        position: fixed;
+        top: 12px;
+        right: 16px;
+        z-index: 20;
+      }
+      .version-picker select {
+        height: 32px;
+        border: 1px solid #d0d5dd;
+        border-radius: 6px;
+        background: #fff;
+        color: #111827;
+        font: 13px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        padding: 0 28px 0 10px;
+      }
     </style>
   </head>
   <body>
+    <div class="version-picker">
+      <select id="version-select" aria-label="API reference version"></select>
+    </div>
     <div id="app"></div>
     <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
     <script>
+      const currentVersion = "latest";
+      const latestVersion = "0.1.0";
+      const siteRoot = "./";
+      const versionsUrl = "./versions.json";
+
+      const select = document.getElementById('version-select');
+      const addVersionOption = (label, value, selected) => {
+        const option = document.createElement('option');
+        option.textContent = label;
+        option.value = value;
+        option.selected = selected;
+        select.appendChild(option);
+      };
+
+      fetch(versionsUrl)
+        .then((response) => response.ok ? response.json() : { latest: latestVersion, versions: [] })
+        .then((data) => {
+          addVersionOption(`latest (${data.latest || latestVersion})`, siteRoot, currentVersion === 'latest');
+          for (const version of data.versions || []) {
+            addVersionOption(`v${version}`, `${siteRoot}v/${version}/`, currentVersion === version);
+          }
+          select.addEventListener('change', () => {
+            window.location.href = select.value;
+          });
+        });
+
       Scalar.createApiReference('#app', {
         url: './openapi.json',
         layout: 'modern',

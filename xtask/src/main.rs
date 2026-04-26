@@ -8,16 +8,90 @@ use hinge_rs::models::*;
 use hinge_rs::ws::SendbirdWsEvent;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let command = std::env::args()
-        .nth(1)
-        .unwrap_or_else(|| "openapi".to_string());
+    let mut args = std::env::args().skip(1);
+    let command = args.next().unwrap_or_else(|| "openapi".to_string());
     match command.as_str() {
-        "openapi" => generate_openapi(),
+        "openapi" => generate_openapi(OpenApiOptions::parse(args)?),
+        "version" => {
+            println!("{}", hinge_rs::VERSION);
+            Ok(())
+        }
         other => Err(format!("unknown xtask command: {other}").into()),
     }
 }
 
-fn generate_openapi() -> Result<(), Box<dyn std::error::Error>> {
+#[derive(Debug)]
+struct OpenApiOptions {
+    site_dir: Option<PathBuf>,
+    site_current: String,
+    site_root: String,
+    site_latest_version: String,
+    site_versions: Vec<String>,
+    site_versions_url: String,
+    write_versions_json: bool,
+}
+
+impl Default for OpenApiOptions {
+    fn default() -> Self {
+        Self {
+            site_dir: None,
+            site_current: "latest".to_string(),
+            site_root: "./".to_string(),
+            site_latest_version: hinge_rs::VERSION.to_string(),
+            site_versions: Vec::new(),
+            site_versions_url: "./versions.json".to_string(),
+            write_versions_json: true,
+        }
+    }
+}
+
+impl OpenApiOptions {
+    fn parse(args: impl Iterator<Item = String>) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut options = Self::default();
+        let mut args = args.peekable();
+        while let Some(arg) = args.next() {
+            match arg.as_str() {
+                "--site-dir" => {
+                    options.site_dir = Some(PathBuf::from(next_value(&mut args, "--site-dir")?));
+                }
+                "--site-current" => {
+                    options.site_current = next_value(&mut args, "--site-current")?;
+                }
+                "--site-root" => {
+                    options.site_root = next_value(&mut args, "--site-root")?;
+                }
+                "--site-latest-version" => {
+                    options.site_latest_version = next_value(&mut args, "--site-latest-version")?;
+                }
+                "--site-versions" => {
+                    options.site_versions = next_value(&mut args, "--site-versions")?
+                        .split(',')
+                        .filter(|version| !version.is_empty())
+                        .map(ToOwned::to_owned)
+                        .collect();
+                }
+                "--site-versions-url" => {
+                    options.site_versions_url = next_value(&mut args, "--site-versions-url")?;
+                }
+                "--no-versions-json" => {
+                    options.write_versions_json = false;
+                }
+                other => return Err(format!("unknown openapi option: {other}").into()),
+            }
+        }
+        Ok(options)
+    }
+}
+
+fn next_value(
+    args: &mut impl Iterator<Item = String>,
+    name: &str,
+) -> Result<String, Box<dyn std::error::Error>> {
+    args.next()
+        .ok_or_else(|| format!("{name} requires a value").into())
+}
+
+fn generate_openapi(options: OpenApiOptions) -> Result<(), Box<dyn std::error::Error>> {
     let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .expect("xtask should live under crate root")
@@ -32,13 +106,46 @@ fn generate_openapi() -> Result<(), Box<dyn std::error::Error>> {
     let spec_text = format!("{}\n", serde_json::to_string_pretty(&spec)?);
     fs::write(openapi_dir.join("hinge-api.openapi.json"), &spec_text)?;
     fs::write(docs_dir.join("openapi.json"), &spec_text)?;
-    fs::write(docs_dir.join("index.html"), scalar_index_html())?;
+    fs::write(
+        docs_dir.join("index.html"),
+        scalar_index_html(&ScalarPageConfig::latest(
+            hinge_rs::VERSION,
+            "./",
+            "./versions.json",
+        ))?,
+    )?;
+    fs::write(
+        docs_dir.join("versions.json"),
+        versions_json(hinge_rs::VERSION, &[])?,
+    )?;
+
+    if let Some(site_dir) = options.site_dir {
+        fs::create_dir_all(&site_dir)?;
+        let page_config = ScalarPageConfig {
+            current_version: options.site_current,
+            latest_version: options.site_latest_version,
+            site_root: options.site_root,
+            versions_url: options.site_versions_url,
+        };
+        fs::write(site_dir.join("openapi.json"), &spec_text)?;
+        fs::write(
+            site_dir.join("index.html"),
+            scalar_index_html(&page_config)?,
+        )?;
+        if options.write_versions_json {
+            fs::write(
+                site_dir.join("versions.json"),
+                versions_json(&page_config.latest_version, &options.site_versions)?,
+            )?;
+        }
+    }
 
     println!(
-        "generated {}, {}, {}",
+        "generated {}, {}, {}, {}",
         display(&openapi_dir.join("hinge-api.openapi.json")),
         display(&docs_dir.join("openapi.json")),
-        display(&docs_dir.join("index.html"))
+        display(&docs_dir.join("index.html")),
+        display(&docs_dir.join("versions.json"))
     );
     Ok(())
 }
@@ -50,8 +157,40 @@ fn display(path: &Path) -> String {
         .to_string()
 }
 
-fn scalar_index_html() -> &'static str {
-    r#"<!doctype html>
+#[derive(Debug)]
+struct ScalarPageConfig {
+    current_version: String,
+    latest_version: String,
+    site_root: String,
+    versions_url: String,
+}
+
+impl ScalarPageConfig {
+    fn latest(latest_version: &str, site_root: &str, versions_url: &str) -> Self {
+        Self {
+            current_version: "latest".to_string(),
+            latest_version: latest_version.to_string(),
+            site_root: site_root.to_string(),
+            versions_url: versions_url.to_string(),
+        }
+    }
+}
+
+fn versions_json(latest_version: &str, versions: &[String]) -> Result<String, serde_json::Error> {
+    let value = json!({
+        "latest": latest_version,
+        "versions": versions,
+    });
+    Ok(format!("{}\n", serde_json::to_string_pretty(&value)?))
+}
+
+fn scalar_index_html(config: &ScalarPageConfig) -> Result<String, serde_json::Error> {
+    let current_version = serde_json::to_string(&config.current_version)?;
+    let latest_version = serde_json::to_string(&config.latest_version)?;
+    let site_root = serde_json::to_string(&config.site_root)?;
+    let versions_url = serde_json::to_string(&config.versions_url)?;
+
+    Ok(r#"<!doctype html>
 <html lang="en">
   <head>
     <title>hinge-rs API Reference</title>
@@ -61,12 +200,56 @@ fn scalar_index_html() -> &'static str {
       body {
         margin: 0;
       }
+      .version-picker {
+        position: fixed;
+        top: 12px;
+        right: 16px;
+        z-index: 20;
+      }
+      .version-picker select {
+        height: 32px;
+        border: 1px solid #d0d5dd;
+        border-radius: 6px;
+        background: #fff;
+        color: #111827;
+        font: 13px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        padding: 0 28px 0 10px;
+      }
     </style>
   </head>
   <body>
+    <div class="version-picker">
+      <select id="version-select" aria-label="API reference version"></select>
+    </div>
     <div id="app"></div>
     <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
     <script>
+      const currentVersion = __CURRENT_VERSION__;
+      const latestVersion = __LATEST_VERSION__;
+      const siteRoot = __SITE_ROOT__;
+      const versionsUrl = __VERSIONS_URL__;
+
+      const select = document.getElementById('version-select');
+      const addVersionOption = (label, value, selected) => {
+        const option = document.createElement('option');
+        option.textContent = label;
+        option.value = value;
+        option.selected = selected;
+        select.appendChild(option);
+      };
+
+      fetch(versionsUrl)
+        .then((response) => response.ok ? response.json() : { latest: latestVersion, versions: [] })
+        .then((data) => {
+          addVersionOption(`latest (${data.latest || latestVersion})`, siteRoot, currentVersion === 'latest');
+          for (const version of data.versions || []) {
+            addVersionOption(`v${version}`, `${siteRoot}v/${version}/`, currentVersion === version);
+          }
+          select.addEventListener('change', () => {
+            window.location.href = select.value;
+          });
+        });
+
       Scalar.createApiReference('#app', {
         url: './openapi.json',
         layout: 'modern',
@@ -82,6 +265,10 @@ fn scalar_index_html() -> &'static str {
   </body>
 </html>
 "#
+    .replace("__CURRENT_VERSION__", &current_version)
+    .replace("__LATEST_VERSION__", &latest_version)
+    .replace("__SITE_ROOT__", &site_root)
+    .replace("__VERSIONS_URL__", &versions_url))
 }
 
 fn openapi_document() -> Value {
@@ -89,7 +276,7 @@ fn openapi_document() -> Value {
         "openapi": "3.1.0",
         "info": {
             "title": "hinge-rs",
-            "version": "0.1.0",
+            "version": hinge_rs::VERSION,
             "description": "Unofficial typed Hinge REST and Sendbird chat API surface generated from hinge-rs.",
             "license": {
                 "name": "MIT OR Apache-2.0"
@@ -823,9 +1010,40 @@ mod tests {
 
     #[test]
     fn scalar_html_references_local_openapi() {
-        let html = scalar_index_html();
+        let html = scalar_index_html(&ScalarPageConfig::latest(
+            hinge_rs::VERSION,
+            "./",
+            "./versions.json",
+        ))
+        .expect("scalar html should render");
         assert!(html.contains("@scalar/api-reference"));
         assert!(html.contains("url: './openapi.json'"));
+        assert!(html.contains("version-select"));
+        assert!(html.contains("./versions.json"));
+    }
+
+    #[test]
+    fn scalar_html_can_reference_parent_versions() {
+        let html = scalar_index_html(&ScalarPageConfig {
+            current_version: "0.1.0".to_string(),
+            latest_version: "0.1.0".to_string(),
+            site_root: "../../".to_string(),
+            versions_url: "../../versions.json".to_string(),
+        })
+        .expect("scalar html should render");
+        assert!(html.contains("const currentVersion = \"0.1.0\";"));
+        assert!(html.contains("const siteRoot = \"../../\";"));
+        assert!(html.contains("const versionsUrl = \"../../versions.json\";"));
+    }
+
+    #[test]
+    fn versions_json_lists_release_versions() {
+        let json = versions_json("0.2.0", &["0.2.0".to_string(), "0.1.0".to_string()])
+            .expect("versions json should render");
+        let value: Value = serde_json::from_str(&json).expect("versions json should parse");
+        assert_eq!(value["latest"], "0.2.0");
+        assert_eq!(value["versions"][0], "0.2.0");
+        assert_eq!(value["versions"][1], "0.1.0");
     }
 
     #[test]
@@ -840,6 +1058,20 @@ mod tests {
             serde_json::to_string_pretty(&openapi_document()).expect("spec should serialize")
         );
         let actual = fs::read_to_string(artifact_path).expect("generated spec should be readable");
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn generated_versions_artifact_is_stable() {
+        let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("xtask should live under crate root")
+            .to_path_buf();
+        let artifact_path = crate_root.join("docs/api/versions.json");
+        let expected =
+            versions_json(hinge_rs::VERSION, &[]).expect("versions json should serialize");
+        let actual =
+            fs::read_to_string(artifact_path).expect("generated versions should be readable");
         assert_eq!(actual, expected);
     }
 }
