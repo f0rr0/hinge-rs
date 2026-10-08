@@ -10082,24 +10082,36 @@
     "local-mock": {
       "color": "#059669",
       "description": "Local Wiremock / WebSocket test server",
-      "variables": {
-        "hingeBaseUrl": "http://127.0.0.1:8080",
-        "sendbirdApiUrl": "http://127.0.0.1:8081/v3"
-      }
+      "variables": [
+        {
+          "name": "hingeBaseUrl",
+          "value": "http://127.0.0.1:8080"
+        },
+        {
+          "name": "sendbirdApiUrl",
+          "value": "http://127.0.0.1:8081/v3"
+        }
+      ]
     },
     "production": {
       "color": "#2563eb",
       "description": "Hinge production and Sendbird production",
-      "variables": {
-        "hingeBaseUrl": {
-          "default": "https://prod-api.hingeaws.net",
-          "description": "Hinge REST API base URL"
+      "variables": [
+        {
+          "name": "hingeBaseUrl",
+          "value": {
+            "default": "https://prod-api.hingeaws.net",
+            "description": "Hinge REST API base URL"
+          }
         },
-        "sendbirdApiUrl": {
-          "default": "https://api-3cdad91c-1e0d-4a0d-bbee-9671988bf9e9.sendbird.com/v3",
-          "description": "Sendbird REST API base URL"
+        {
+          "name": "sendbirdApiUrl",
+          "value": {
+            "default": "https://api-3cdad91c-1e0d-4a0d-bbee-9671988bf9e9.sendbird.com/v3",
+            "description": "Sendbird REST API base URL"
+          }
         }
-      }
+      ]
     }
   }
 }

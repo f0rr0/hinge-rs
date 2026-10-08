@@ -11,6 +11,7 @@ on:
       - "docs/api/**"
       - "openapi/**"
       - "scripts/build-pages.sh"
+      - "scripts/prepare-pages.py"
       - "src/**"
       - "xtask/**"
   workflow_dispatch:

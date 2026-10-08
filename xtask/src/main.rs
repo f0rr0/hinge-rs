@@ -223,7 +223,7 @@ fn scalar_index_html(config: &ScalarPageConfig) -> Result<String, serde_json::Er
       <select id="version-select" aria-label="API reference version"></select>
     </div>
     <div id="app"></div>
-    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.73.1"></script>
     <script>
       const currentVersion = __CURRENT_VERSION__;
       const latestVersion = __LATEST_VERSION__;
@@ -312,24 +312,24 @@ fn openapi_document() -> Value {
             "production": {
                 "description": "Hinge production and Sendbird production",
                 "color": "#2563eb",
-                "variables": {
-                    "hingeBaseUrl": {
+                "variables": [
+                    {"name": "hingeBaseUrl", "value": {
                         "description": "Hinge REST API base URL",
                         "default": "https://prod-api.hingeaws.net"
-                    },
-                    "sendbirdApiUrl": {
+                    }},
+                    {"name": "sendbirdApiUrl", "value": {
                         "description": "Sendbird REST API base URL",
                         "default": "https://api-3cdad91c-1e0d-4a0d-bbee-9671988bf9e9.sendbird.com/v3"
-                    }
-                }
+                    }}
+                ]
             },
             "local-mock": {
                 "description": "Local Wiremock / WebSocket test server",
                 "color": "#059669",
-                "variables": {
-                    "hingeBaseUrl": "http://127.0.0.1:8080",
-                    "sendbirdApiUrl": "http://127.0.0.1:8081/v3"
-                }
+                "variables": [
+                    {"name": "hingeBaseUrl", "value": "http://127.0.0.1:8080"},
+                    {"name": "sendbirdApiUrl", "value": "http://127.0.0.1:8081/v3"}
+                ]
             }
         },
         "tags": [

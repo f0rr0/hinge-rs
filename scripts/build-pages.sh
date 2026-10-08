@@ -59,4 +59,6 @@ for version in "${versions[@]}"; do
   )
 done
 
+python3 scripts/prepare-pages.py "$output_dir"
+
 echo "built versioned API docs in ${output_dir}"
