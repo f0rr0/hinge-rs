@@ -7,6 +7,16 @@ version bumps, changelog updates, GitHub releases, and crates.io publishing.
 
 ## Unreleased
 
+## [0.2.0](https://github.com/f0rr0/hinge-rs/compare/v0.1.1...v0.2.0) - 2026-10-08
+
+### Fixed
+
+- restore app 10.0.0 chat and profile reads ([#29](https://github.com/f0rr0/hinge-rs/pull/29))
+
+### Security
+
+- update vulnerable anyhow, h2, and rustls dependencies
+
 ## [0.1.1](https://github.com/f0rr0/hinge-rs/compare/v0.1.0...v0.1.1) - 2026-04-26
 
 ### Changed
