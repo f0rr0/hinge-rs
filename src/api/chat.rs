@@ -3,10 +3,17 @@ use crate::errors::HingeError;
 use crate::models::{
     ExportChatInput, ExportChatResult, SendMessagePayload, SendbirdChannelHandle,
     SendbirdChannelsResponse, SendbirdCloseRequest, SendbirdGetMessagesInput, SendbirdGroupChannel,
-    SendbirdMessage, SendbirdMessagesResponse, SendbirdReadResponse,
+    SendbirdMessage, SendbirdMessagesResponse,
 };
 use crate::storage::Storage;
 use crate::ws::SendbirdWsSubscription;
+use std::time::Duration;
+
+/// How long to watch for a refusal after marking a channel read.
+///
+/// Long enough for an `EROR` to come back, short enough that opening a conversation does not
+/// visibly stall on it.
+const MARK_READ_REFUSAL_WINDOW: Duration = Duration::from_secs(2);
 
 pub struct ChatApi<'a, S: Storage + Clone> {
     pub(super) client: &'a mut HingeClient<S>,
@@ -99,7 +106,7 @@ impl<S: Storage + Clone> ChatApi<'_, S> {
     }
 
     pub async fn send_message(
-        &self,
+        &mut self,
         payload: SendMessagePayload,
     ) -> Result<serde_json::Value, HingeError> {
         self.client.send_message(payload).await
@@ -126,12 +133,15 @@ impl<S: Storage + Clone> ChatApi<'_, S> {
         self.client.sendbird_ws_send_command(command).await
     }
 
-    pub async fn mark_read(
-        &mut self,
-        channel_url: &str,
-    ) -> Result<SendbirdReadResponse, HingeError> {
+    /// Clear our unread count for a channel, failing only if Sendbird refuses.
+    ///
+    /// Returns `()` rather than a read receipt because Sendbird sends the reader no
+    /// acknowledgment for their own `READ` — see
+    /// [`HingeClient::sendbird_ws_send_read_and_confirm`]. To confirm positively, re-read the
+    /// channel and check `unread_message_count`.
+    pub async fn mark_read(&mut self, channel_url: &str) -> Result<(), HingeError> {
         self.client
-            .sendbird_ws_send_read_and_wait(channel_url)
+            .sendbird_ws_send_read_and_confirm(channel_url, MARK_READ_REFUSAL_WINDOW)
             .await
     }
 

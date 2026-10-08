@@ -257,6 +257,13 @@
           "subjectId": {
             "default": "",
             "type": "string"
+          },
+          "viewToken": {
+            "description": "Authorises fetching this match's public profile.\n\nOnly present on the single-subject read (`/connection/subject/{id}`), not on the list.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "title": "ConnectionDetailApi",
@@ -308,6 +315,13 @@
           "subjectId": {
             "default": "",
             "type": "string"
+          },
+          "viewToken": {
+            "description": "Authorises fetching this match's public profile.\n\nOnly present on the single-subject read (`/connection/subject/{id}`), not on the list.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "title": "ConnectionItem",
@@ -1280,6 +1294,13 @@
           },
           "subjectId": {
             "type": "string"
+          },
+          "viewToken": {
+            "description": "Authorises fetching this person's public profile.\n\nOnly present on the single-subject read (`/like/subject/{id}`), not on the list. See\n[`crate::client::HingeClient::get_profiles_with_view_token`] for what it is for.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -3097,6 +3118,25 @@
           "$ref": "#/components/schemas/ProfileContentFull"
         },
         "type": "array"
+      },
+      "PublicIdsRequest": {
+        "properties": {
+          "ids": {
+            "description": "User IDs, as JSON strings. A JSON number or a comma-joined string is rejected with 400.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "viewToken": {
+            "description": "Authorises the read. Without it the server answers 412 for any non-empty `ids`, whoever is asked for. Issued per subject by GET /like/subject/{id} and GET /connection/subject/{id}; scoped to that subject, so it does not authorise anyone else. A recommendation's `ratingToken` is a different thing and is refused here.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "type": "object"
       },
       "PublicProfile": {
         "properties": {
@@ -6742,20 +6782,20 @@
       }
     },
     "/content/v2/public": {
-      "get": {
-        "description": "Fetches public content records by comma-separated user IDs.",
+      "post": {
+        "description": "Fetches public content records — photos and prompt answers — for a list of user IDs. Same shape and same `viewToken` requirement as `/user/v3/public`; one token opens both.",
         "operationId": "getPublicProfileContent",
-        "parameters": [
-          {
-            "description": "Comma-separated user IDs",
-            "in": "query",
-            "name": "ids",
-            "required": true,
-            "schema": {
-              "type": "string"
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicIdsRequest"
+              }
             }
-          }
-        ],
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
@@ -9715,20 +9755,20 @@
       }
     },
     "/user/v3/public": {
-      "get": {
-        "description": "Fetches public profile records by comma-separated user IDs.",
+      "post": {
+        "description": "Fetches public profile records for a list of user IDs. As of app 10.0.0 a GET with an `ids` query answers 405; this route takes a POST body. A `viewToken` is required: without one the server answers 412 for any non-empty `ids`. Tokens are issued per subject and only for people who liked you or matched you.",
         "operationId": "getPublicProfiles",
-        "parameters": [
-          {
-            "description": "Comma-separated user IDs",
-            "in": "query",
-            "name": "ids",
-            "required": true,
-            "schema": {
-              "type": "string"
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicIdsRequest"
+              }
             }
-          }
-        ],
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
