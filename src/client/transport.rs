@@ -117,7 +117,11 @@ impl<S: Storage + Clone> HingeClient<S> {
         let mut h = HeaderMap::new();
         h.insert("content-type", HeaderValue::from_static("application/json"));
         h.insert("accept", HeaderValue::from_static("*/*"));
-        h.insert("accept-language", HeaderValue::from_static("en-GB"));
+        h.insert(
+            "accept-language",
+            HeaderValue::from_str(&self.settings.accept_language)
+                .map_err(|e| HingeError::Http(format!("Invalid accept-language header: {}", e)))?,
+        );
         h.insert("connection", HeaderValue::from_static("keep-alive"));
         h.insert(
             "accept-encoding",
@@ -128,7 +132,11 @@ impl<S: Storage + Clone> HingeClient<S> {
             HeaderValue::from_static("iPhone15,2"),
         );
         h.insert("x-device-model", HeaderValue::from_static("unknown"));
-        h.insert("x-device-region", HeaderValue::from_static("IN"));
+        h.insert(
+            "x-device-region",
+            HeaderValue::from_str(&self.settings.device_region)
+                .map_err(|e| HingeError::Http(format!("Invalid device region header: {}", e)))?,
+        );
         h.insert(
             "x-session-id",
             HeaderValue::from_str(&self.session_id)

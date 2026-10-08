@@ -24,7 +24,7 @@ fn sensitive_header_value(
     {
         return format!(
             "***{}",
-            &value
+            value
                 .to_str()
                 .unwrap_or("")
                 .chars()

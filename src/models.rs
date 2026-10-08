@@ -663,6 +663,12 @@ pub struct LikeItemV2 {
     pub source: String,
     pub initiated_with: String,
     pub rating: LikeRating,
+    /// Authorises fetching this person's public profile.
+    ///
+    /// Only present on the single-subject read (`/like/subject/{id}`), not on the list. See
+    /// [`crate::client::HingeClient::get_profiles_with_view_token`] for what it is for.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub view_token: Option<String>,
 }
 
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -1544,6 +1550,11 @@ pub struct ConnectionItem {
     pub social_media_exchanged_timestamp: Option<String>,
     #[serde(default)]
     pub is_hidden: bool,
+    /// Authorises fetching this match's public profile.
+    ///
+    /// Only present on the single-subject read (`/connection/subject/{id}`), not on the list.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub view_token: Option<String>,
 }
 
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]

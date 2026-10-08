@@ -379,10 +379,10 @@ fn paths() -> Value {
             "post": operation("Recommendations", "Get recommendations", "Fetches recommendation feeds for the authenticated user.", Some(schema_ref("RecommendationsRequest")), Some(schema_ref("RecommendationsResponse")), true)
         },
         "/user/v3/public": {
-            "get": operation_with_params("Profiles", "Get public profiles", "Fetches public profile records by comma-separated user IDs.", vec![query_param("ids", "Comma-separated user IDs", true)], None, Some(schema_ref("PublicProfilesResponse")), true)
+            "post": operation("Profiles", "Get public profiles", "Fetches public profile records for a list of user IDs. As of app 10.0.0 a GET with an `ids` query answers 405; this route takes a POST body. A `viewToken` is required: without one the server answers 412 for any non-empty `ids`. Tokens are issued per subject and only for people who liked you or matched you.", Some(schema_ref("PublicIdsRequest")), Some(schema_ref("PublicProfilesResponse")), true)
         },
         "/content/v2/public": {
-            "get": operation_with_params("Profiles", "Get public profile content", "Fetches public content records by comma-separated user IDs.", vec![query_param("ids", "Comma-separated user IDs", true)], None, Some(schema_ref("PublicContentResponse")), true)
+            "post": operation("Profiles", "Get public profile content", "Fetches public content records — photos and prompt answers — for a list of user IDs. Same shape and same `viewToken` requirement as `/user/v3/public`; one token opens both.", Some(schema_ref("PublicIdsRequest")), Some(schema_ref("PublicContentResponse")), true)
         },
         "/likelimit": {
             "get": operation("Likes", "Get like limit", "Fetches remaining standard and super likes.", None, Some(schema_ref("LikeLimit")), true)
@@ -567,6 +567,24 @@ fn schemas() -> Value {
             ("newHere", "boolean"),
             ("activeToday", "boolean"),
         ]),
+    );
+    schemas.insert(
+        "PublicIdsRequest".into(),
+        json!({
+            "type": "object",
+            "required": ["ids"],
+            "properties": {
+                "ids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "User IDs, as JSON strings. A JSON number or a comma-joined string is rejected with 400."
+                },
+                "viewToken": {
+                    "type": "string",
+                    "description": "Authorises the read. Without it the server answers 412 for any non-empty `ids`, whoever is asked for. Issued per subject by GET /like/subject/{id} and GET /connection/subject/{id}; scoped to that subject, so it does not authorise anyone else. A recommendation's `ratingToken` is a different thing and is refused here."
+                }
+            }
+        }),
     );
     schemas.insert(
         "PreferencesUpdateRequest".into(),

@@ -9,6 +9,11 @@ use crate::models::{
 use crate::storage::Storage;
 use std::collections::HashSet;
 
+/// Public profile vitals, by id.
+const PUBLIC_PROFILES_PATH: &str = "/user/v3/public";
+/// Public profile content (photos, prompt answers), by id.
+const PUBLIC_CONTENT_PATH: &str = "/content/v2/public";
+
 impl<S: Storage + Clone> HingeClient<S> {
     pub async fn rendered_profile_text_for_user(
         &mut self,
@@ -66,25 +71,36 @@ impl<S: Storage + Clone> HingeClient<S> {
         &self,
         ids: Vec<String>,
     ) -> Result<serde_json::Value, HingeError> {
-        let url = format!(
-            "{}/user/v3/public?ids={}",
-            self.settings.base_url,
-            ids.join(",")
-        );
-        let res = self.http_get(&url).await?;
-        self.parse_response(res).await
+        self.post_public_ids(PUBLIC_PROFILES_PATH, &ids, None).await
     }
 
     pub async fn get_content_public_raw_unfiltered(
         &self,
         ids: Vec<String>,
     ) -> Result<serde_json::Value, HingeError> {
-        let url = format!(
-            "{}/content/v2/public?ids={}",
-            self.settings.base_url,
-            ids.join(",")
-        );
-        let res = self.http_get(&url).await?;
+        self.post_public_ids(PUBLIC_CONTENT_PATH, &ids, None).await
+    }
+
+    /// Ask a public endpoint for a set of ids.
+    ///
+    /// POST rather than GET: as of Hinge app 10.0.0 both public routes answer
+    /// `405 Method Not Allowed` to the `GET ...?ids=` they used to serve. They accept
+    /// `POST {"ids": ["<id>", ...]}`, and the ids must be JSON *strings* — a number, or a
+    /// comma-joined string, is rejected with 400.
+    ///
+    /// Without a `viewToken` the server answers `412 Precondition Failed` for any non-empty
+    /// id list — see [`HingeClient::get_profiles_with_view_token`] for where a token comes
+    /// from and what it covers.
+    async fn post_public_ids<T: serde::de::DeserializeOwned>(
+        &self,
+        path: &str,
+        ids: &[String],
+        view_token: Option<&str>,
+    ) -> Result<T, HingeError> {
+        let url = format!("{}{}", self.settings.base_url, path);
+        let res = self
+            .http_post(&url, &public_ids_body(ids, view_token))
+            .await?;
         self.parse_response(res).await
     }
 
@@ -99,13 +115,9 @@ impl<S: Storage + Clone> HingeClient<S> {
 
         let mut aggregated: Vec<PublicUserProfile> = Vec::new();
         for batch in chunks {
-            let url = format!(
-                "{}/user/v3/public?ids={}",
-                self.settings.base_url,
-                batch.join(",")
-            );
-            let res = self.http_get(&url).await?;
-            let mut part: Vec<PublicUserProfile> = self.parse_response(res).await?;
+            let mut part: Vec<PublicUserProfile> = self
+                .post_public_ids(PUBLIC_PROFILES_PATH, &batch, None)
+                .await?;
             aggregated.append(&mut part);
         }
         Ok(aggregated)
@@ -122,16 +134,112 @@ impl<S: Storage + Clone> HingeClient<S> {
 
         let mut aggregated: Vec<ProfileContentFull> = Vec::new();
         for batch in chunks {
-            let url = format!(
-                "{}/content/v2/public?ids={}",
-                self.settings.base_url,
-                batch.join(",")
-            );
-            let res = self.http_get(&url).await?;
-            let mut part: Vec<ProfileContentFull> = self.parse_response(res).await?;
+            let mut part: Vec<ProfileContentFull> = self
+                .post_public_ids(PUBLIC_CONTENT_PATH, &batch, None)
+                .await?;
             aggregated.append(&mut part);
         }
         Ok(aggregated)
+    }
+
+    /// Fetch public profile vitals for one person, authorised by their `viewToken`.
+    ///
+    /// The public endpoints refuse an unauthorised read with `412 Precondition Failed`, no
+    /// matter whose id is asked for — the caller's own included. The `viewToken` is what
+    /// lifts it: proof that Hinge showed you this person. It is issued per subject by the
+    /// single-subject reads, [`HingeClient::view_token_for_like`] and
+    /// [`HingeClient::view_token_for_connection`], and it does not appear on the list reads.
+    ///
+    /// Scoped to its subject: a token minted for one person does not authorise another, so
+    /// there is no batching to be had here even though the wire format takes a list. The
+    /// `ids` list stays a list only because that is the shape the endpoint wants.
+    ///
+    /// Not everyone is reachable this way. A token exists for people who have liked you and
+    /// for your matches; a recommendation from the discovery feed carries a `ratingToken`,
+    /// which is a different thing and is refused in this slot. Those profiles cannot
+    /// currently be read over REST at all.
+    pub async fn get_profiles_with_view_token(
+        &self,
+        user_ids: Vec<String>,
+        view_token: &str,
+    ) -> Result<Vec<PublicUserProfile>, HingeError> {
+        self.post_public_ids(PUBLIC_PROFILES_PATH, &user_ids, Some(view_token))
+            .await
+    }
+
+    /// Fetch public profile content — photos and prompt answers — for one person.
+    ///
+    /// Same authorisation rules as [`Self::get_profiles_with_view_token`]: the vitals and the
+    /// content live on separate routes, and one token opens both.
+    pub async fn get_profile_content_with_view_token(
+        &self,
+        user_ids: Vec<String>,
+        view_token: &str,
+    ) -> Result<Vec<ProfileContentFull>, HingeError> {
+        self.post_public_ids(PUBLIC_CONTENT_PATH, &user_ids, Some(view_token))
+            .await
+    }
+
+    /// The `viewToken` for someone who has liked you.
+    ///
+    /// Reads `/like/subject/{id}`, which carries the token; the `/like/v2` list does not.
+    pub async fn view_token_for_like(&self, subject_id: &str) -> Result<String, HingeError> {
+        self.get_like_subject(subject_id)
+            .await?
+            .view_token
+            .ok_or_else(|| HingeError::Http(format!("no viewToken on like subject {}", subject_id)))
+    }
+
+    /// The `viewToken` for one of your matches.
+    ///
+    /// Reads `/connection/subject/{id}`, which carries the token; `/connection/v2` does not.
+    pub async fn view_token_for_connection(&self, subject_id: &str) -> Result<String, HingeError> {
+        self.get_connection_detail(subject_id)
+            .await?
+            .connection
+            .view_token
+            .ok_or_else(|| {
+                HingeError::Http(format!("no viewToken on connection subject {}", subject_id))
+            })
+    }
+
+    /// Render one person's profile as text, authorised by their `viewToken`.
+    ///
+    /// The token-less [`Self::rendered_profile_text_for_user`] cannot work against the
+    /// current API; this is the version that does.
+    pub async fn rendered_profile_text_with_view_token(
+        &mut self,
+        user_id: &str,
+        view_token: &str,
+    ) -> Result<String, HingeError> {
+        let uid = user_id.trim();
+        if uid.is_empty() {
+            return Ok(String::new());
+        }
+
+        let prompts_manager = match self.fetch_prompts_manager().await {
+            Ok(mgr) => Some(mgr),
+            Err(err) => {
+                log::warn!("Failed to prefetch prompts for rendered profile: {}", err);
+                None
+            }
+        };
+        let profile = self
+            .get_profiles_with_view_token(vec![uid.to_string()], view_token)
+            .await?
+            .into_iter()
+            .next();
+        let profile_content = self
+            .get_profile_content_with_view_token(vec![uid.to_string()], view_token)
+            .await?
+            .into_iter()
+            .next();
+
+        Ok(render_profile(
+            profile.as_ref(),
+            profile_content.as_ref(),
+            prompts_manager.as_ref(),
+        ))
     }
 
     pub async fn update_self_preferences(
@@ -236,5 +344,60 @@ impl<S: Storage + Clone> HingeClient<S> {
             );
         }
         out
+    }
+}
+
+/// The request body both public endpoints expect: ids as JSON strings under `ids`, plus the
+/// `viewToken` that authorises the read when one is available.
+fn public_ids_body(ids: &[String], view_token: Option<&str>) -> serde_json::Value {
+    match view_token {
+        Some(token) => serde_json::json!({ "ids": ids, "viewToken": token }),
+        None => serde_json::json!({ "ids": ids }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ids_are_sent_as_strings_under_ids() {
+        let body = public_ids_body(&["1000000000000000001".to_string(), "42".to_string()], None);
+        assert_eq!(
+            body,
+            serde_json::json!({ "ids": ["1000000000000000001", "42"] })
+        );
+        // A JSON number here is rejected by the server with 400, so the type matters.
+        assert!(body["ids"][0].is_string());
+    }
+
+    #[test]
+    fn an_empty_request_is_still_an_ids_array() {
+        assert_eq!(public_ids_body(&[], None), serde_json::json!({ "ids": [] }));
+    }
+
+    #[test]
+    fn a_view_token_rides_alongside_the_ids() {
+        let body = public_ids_body(&["1000000000000000001".to_string()], Some("tok-abc"));
+        assert_eq!(
+            body,
+            serde_json::json!({ "ids": ["1000000000000000001"], "viewToken": "tok-abc" })
+        );
+    }
+
+    #[test]
+    fn no_view_token_key_is_sent_when_there_is_none() {
+        // The server rejects a non-empty request without it, but an empty probe still has to
+        // go out clean rather than carrying a null.
+        let body = public_ids_body(&["42".to_string()], None);
+        assert!(body.get("viewToken").is_none());
+    }
+
+    #[test]
+    fn public_paths_are_the_ones_the_server_still_routes() {
+        assert_eq!(PUBLIC_PROFILES_PATH, "/user/v3/public");
+        assert_eq!(PUBLIC_CONTENT_PATH, "/content/v2/public");
+        // /user/v2/public answers 404 - it is not a fallback.
+        assert_ne!(PUBLIC_PROFILES_PATH, "/user/v2/public");
     }
 }

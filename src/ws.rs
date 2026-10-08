@@ -64,6 +64,61 @@ impl SendbirdWsSubscription {
     }
 }
 
+/// Sendbird's error code for a command sent over a connection that never authenticated.
+///
+/// The WS handshake does not reject a bad credential, so a connection can come up as a *guest*
+/// and read normally; this code on the first write is the only signal that it did.
+pub const SENDBIRD_ERROR_GUEST_NOT_ALLOWED: i64 = 900030;
+
+/// A refusal Sendbird reported for one of our commands.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SendbirdRefusal {
+    pub code: i64,
+    pub message: String,
+}
+
+impl SendbirdRefusal {
+    /// True when the refusal says the connection is unauthenticated, so re-authenticating
+    /// and retrying is worth doing.
+    pub fn is_guest_not_allowed(&self) -> bool {
+        is_guest_refusal(self.code, &self.message)
+    }
+}
+
+/// True when a Sendbird refusal reports an unauthenticated connection.
+///
+/// The message is checked as well as the code because the code is what Sendbird documents but
+/// the text is what it has been observed to send; either alone would miss cases.
+pub fn is_guest_refusal(code: i64, message: &str) -> bool {
+    code == SENDBIRD_ERROR_GUEST_NOT_ALLOWED
+        || message.to_lowercase().contains("guest is not allowed")
+}
+
+/// Read a refusal out of a dispatched Sendbird frame body, if it is one.
+///
+/// `EROR` bodies carry `{"error":true,"code":900030,"message":"Guest is not allowed."}`; the
+/// `MESG` echo that confirms a successful send carries neither key. Checking the body rather
+/// than the frame's four-character prefix lets code that has already parsed the JSON — the
+/// `req_id` dispatcher, for one — tell success from refusal without keeping the prefix around.
+pub fn sendbird_frame_refusal(body: &serde_json::Value) -> Option<SendbirdRefusal> {
+    let flagged = body
+        .get("error")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+    let code = body.get("code").and_then(serde_json::Value::as_i64);
+    if !flagged && code.is_none() {
+        return None;
+    }
+    Some(SendbirdRefusal {
+        code: code.unwrap_or_default(),
+        message: body
+            .get("message")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("no message")
+            .to_string(),
+    })
+}
+
 pub fn parse_sendbird_ws_frame(frame: &str) -> Result<SendbirdWsEvent, HingeError> {
     if let Some(rest) = frame.strip_prefix("__SESSION_KEY__:") {
         return Ok(SendbirdWsEvent::SessionKey {
@@ -136,6 +191,49 @@ fn parse_prefixed_json(frame: &str) -> Result<SendbirdWsEvent, HingeError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_a_refusal_out_of_an_eror_body() {
+        let body = serde_json::json!({
+            "error": true,
+            "code": 900030,
+            "message": "Guest is not allowed.",
+            "req_id": "REQ-1"
+        });
+        let refusal = sendbird_frame_refusal(&body).expect("EROR body should be a refusal");
+        assert_eq!(refusal.code, SENDBIRD_ERROR_GUEST_NOT_ALLOWED);
+        assert!(refusal.is_guest_not_allowed());
+    }
+
+    #[test]
+    fn a_message_echo_is_not_a_refusal() {
+        let body = serde_json::json!({
+            "msg_id": 42,
+            "ts": 1_700_000_000_000_i64,
+            "message": "hi",
+            "req_id": "REQ-1"
+        });
+        assert!(sendbird_frame_refusal(&body).is_none());
+    }
+
+    #[test]
+    fn a_non_guest_refusal_is_not_retried() {
+        let body = serde_json::json!({
+            "error": true,
+            "code": 900041,
+            "message": "User is muted."
+        });
+        let refusal = sendbird_frame_refusal(&body).expect("EROR body should be a refusal");
+        assert!(!refusal.is_guest_not_allowed());
+    }
+
+    #[test]
+    fn guest_refusal_is_recognised_by_message_when_the_code_is_missing() {
+        let body = serde_json::json!({ "error": true, "message": "Guest is not allowed." });
+        let refusal = sendbird_frame_refusal(&body).expect("EROR body should be a refusal");
+        assert_eq!(refusal.code, 0);
+        assert!(refusal.is_guest_not_allowed());
+    }
 
     #[test]
     fn parses_logi_session_key() {
