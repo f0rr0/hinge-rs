@@ -15,19 +15,42 @@
         z-index: 20;
       }
       .version-picker select {
+        appearance: none;
         height: 32px;
-        border: 1px solid #d0d5dd;
-        border-radius: 6px;
-        background: #fff;
-        color: #111827;
-        font: 13px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        padding: 0 28px 0 10px;
+        border: 1px solid var(--scalar-border-color, #dfdfdf);
+        border-radius: var(--scalar-radius-lg, 6px);
+        background: var(--scalar-background-2, #f6f6f6);
+        color: var(--scalar-color-1, #1b1b1b);
+        font: 400 13px/1.2 var(--scalar-font, system-ui, sans-serif);
+        padding: 0 34px 0 12px;
+        cursor: pointer;
+      }
+      .version-picker select:hover {
+        background: var(--scalar-background-3, #e7e7e7);
+      }
+      .version-picker select:focus-visible {
+        outline: 2px solid var(--scalar-color-accent, #0099ff);
+        outline-offset: 2px;
+      }
+      .version-picker svg {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 16px;
+        height: 16px;
+        color: var(--scalar-color-2, #707070);
+        pointer-events: none;
       }
     </style>
   </head>
   <body>
     <div class="version-picker">
       <select id="version-select" aria-label="API reference version"></select>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <path d="m6 9 6 6 6-6" />
+      </svg>
     </div>
     <div id="app"></div>
     <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.73.1"></script>
